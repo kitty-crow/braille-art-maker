@@ -1,0 +1,29 @@
+.pages-body {
+    & h1,
+    & h2,
+    & h3,
+    & p {
+        margin-top: 0;
+    }
+
+    & h1,
+    & h2,
+    & h3 {
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+    }
+}
+
+.pages-eyebrow {
+    margin: 0 0 0.35rem;
+    color: var(--pages-accent);
+    font-size: 0.72rem;
+    font-weight: 850;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.pages-lead {
+    color: var(--pages-muted);
+    font-size: 1.05rem;
+}

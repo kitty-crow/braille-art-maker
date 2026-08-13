@@ -1,0 +1,40 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    min-height: 100%;
+    background: var(--pages-page);
+}
+
+.pages-body {
+    min-height: 100vh;
+    margin: 0;
+    background: var(--pages-page);
+    color: var(--pages-text);
+    font-family: var(--pages-font);
+    line-height: 1.5;
+
+    & button,
+    & input,
+    & select,
+    & textarea {
+        font: inherit;
+    }
+
+    & button {
+        cursor: pointer;
+    }
+
+    & a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    & img {
+        display: block;
+        max-width: 100%;
+    }
+}

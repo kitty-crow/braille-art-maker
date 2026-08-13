@@ -1,0 +1,75 @@
+name: Chore version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install
+        run: bun install
+      - name: Increment version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          number="$(bun __TEMPLATE__/src/cli.ts version \"$BUMP\")"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Check
+        run: bun __TEMPLATE__/src/cli.ts check pages.config.ts
+      - name: Build
+        run: bun __TEMPLATE__/src/cli.ts build pages.config.ts
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json version.json
+          git commit -m "[skip ci] chore: version v${{ steps.version.outputs.number }}"
+          git tag "v${{ steps.version.outputs.number }}"
+          git push origin HEAD:main --follow-tags
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: version
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

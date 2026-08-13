@@ -1,0 +1,32 @@
+.pages-button {
+    display: inline-flex;
+    min-height: 2.55rem;
+    align-items: center;
+    justify-content: center;
+    padding: 0.62rem 0.86rem;
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    font-weight: 850;
+
+    &.pages-button--primary {
+        background: var(--pages-accent);
+        color: var(--pages-surface);
+    }
+
+    &.pages-button--secondary {
+        border-color: var(--pages-border);
+        background: var(--pages-surface);
+        color: var(--pages-accent);
+    }
+
+    &.pages-button--quiet {
+        border-color: var(--pages-border);
+        background: var(--pages-surface-2);
+        color: var(--pages-text);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+}

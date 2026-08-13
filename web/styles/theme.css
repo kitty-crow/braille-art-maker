@@ -1,0 +1,35 @@
+.pages-theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.58rem;
+    border: 1px solid var(--pages-border);
+    border-radius: 999px;
+    background: var(--pages-surface);
+    color: var(--pages-text);
+    font-size: 0.76rem;
+    font-weight: 800;
+
+    & .pages-theme__track {
+        position: relative;
+        width: 2rem;
+        height: 1.08rem;
+        border-radius: 999px;
+        background: var(--pages-accent-soft);
+    }
+
+    & .pages-theme__thumb {
+        position: absolute;
+        top: 0.16rem;
+        left: 0.16rem;
+        width: 0.76rem;
+        height: 0.76rem;
+        border-radius: 50%;
+        background: var(--pages-accent);
+        transition: translate 0.2s ease;
+    }
+
+    &[data-theme-state="dark"] .pages-theme__thumb {
+        translate: 0.92rem;
+    }
+}

@@ -1,0 +1,89 @@
+name: Reusable Pages version
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        type: string
+        required: true
+      bun-version:
+        type: string
+        default: "1.3.14"
+      install-command:
+        type: string
+        default: "bun install"
+      version-command:
+        type: string
+        required: true
+      check-command:
+        type: string
+        required: true
+      build-command:
+        type: string
+        required: true
+      artifact-path:
+        type: string
+        default: "site"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
+      - name: Install
+        if: inputs.install-command != ''
+        run: ${{ inputs.install-command }}
+      - name: Increment version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION_COMMAND: ${{ inputs.version-command }}
+        run: |
+          number="$(bash -lc "$VERSION_COMMAND \"$BUMP\"")"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Check
+        run: ${{ inputs.check-command }}
+      - name: Build
+        run: ${{ inputs.build-command }}
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "[skip ci] chore: version v${{ steps.version.outputs.number }}"
+          git tag "v${{ steps.version.outputs.number }}"
+          git push origin HEAD:main --follow-tags
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ inputs.artifact-path }}
+
+  deploy:
+    needs: version
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,32 @@
+.pages-field {
+    display: grid;
+    gap: 0.35rem;
+
+    & label,
+    & .pages-field__label {
+        color: var(--pages-muted);
+        font-size: 0.8rem;
+        font-weight: 750;
+    }
+
+    & input,
+    & select,
+    & textarea {
+        width: 100%;
+        min-height: 2.7rem;
+        padding: 0.6rem 0.72rem;
+        border: 1px solid var(--pages-border);
+        border-radius: 0.75rem;
+        background: var(--pages-surface-2);
+        color: var(--pages-text);
+    }
+
+    & textarea {
+        min-height: 8rem;
+        resize: vertical;
+    }
+
+    & small {
+        color: var(--pages-muted);
+    }
+}

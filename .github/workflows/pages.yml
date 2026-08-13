@@ -1,0 +1,66 @@
+name: Reusable Pages build
+
+on:
+  workflow_call:
+    inputs:
+      bun-version:
+        type: string
+        default: "1.3.14"
+      install-command:
+        type: string
+        default: "bun install"
+      check-command:
+        type: string
+        required: true
+      build-command:
+        type: string
+        required: true
+      artifact-path:
+        type: string
+        default: "site"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ inputs.bun-version }}
+      - name: Install
+        if: inputs.install-command != ''
+        run: ${{ inputs.install-command }}
+      - name: Check
+        run: ${{ inputs.check-command }}
+      - name: Build
+        run: ${{ inputs.build-command }}
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ inputs.artifact-path }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

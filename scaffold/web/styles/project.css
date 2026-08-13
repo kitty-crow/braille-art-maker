@@ -1,0 +1,28 @@
+:root {
+    --pages-accent: #5263d9;
+    --pages-accent-soft: #e7eafe;
+}
+
+:root[data-theme="dark"] {
+    --pages-accent: #9ba5ff;
+    --pages-accent-soft: #292e51;
+}
+
+.project-intro {
+    max-width: 46rem;
+    padding: 1.2rem 0 1.5rem;
+
+    & h1 {
+        margin-bottom: 0.5rem;
+        font-size: clamp(2rem, 5vw, 3rem);
+    }
+}
+
+.project-copy {
+    max-width: 52rem;
+    padding: 1.2rem;
+
+    & p {
+        color: var(--pages-muted);
+    }
+}

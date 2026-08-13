@@ -1,0 +1,6 @@
+.pages-panel {
+    border: 1px solid color-mix(in srgb, var(--pages-border) 90%, transparent);
+    border-radius: var(--pages-radius);
+    background: color-mix(in srgb, var(--pages-surface) 96%, transparent);
+    box-shadow: var(--pages-shadow);
+}

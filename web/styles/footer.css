@@ -1,0 +1,29 @@
+.pages-footer {
+    width: min(calc(100% - 2rem), var(--pages-content));
+    margin: auto;
+    padding: 1.5rem 0 2.5rem;
+    border-top: 1px solid var(--pages-border);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--pages-muted);
+    font-size: 0.82rem;
+
+    & a {
+        color: var(--pages-accent);
+        font-weight: 750;
+    }
+}
+
+.pages-kofi-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    & > img {
+        width: 1.05rem;
+        height: 1.05rem;
+        flex: 0 0 auto;
+        object-fit: contain;
+    }
+}

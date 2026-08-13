@@ -1,0 +1,19 @@
+.pages-nav {
+    display: flex;
+    justify-content: center;
+    gap: 0.2rem;
+
+    & a {
+        padding: 0.5rem 0.72rem;
+        border-radius: 999px;
+        color: var(--pages-muted);
+        font-size: 0.86rem;
+        font-weight: 750;
+
+        &:hover,
+        &[aria-current="page"] {
+            background: var(--pages-accent-soft);
+            color: var(--pages-accent);
+        }
+    }
+}
