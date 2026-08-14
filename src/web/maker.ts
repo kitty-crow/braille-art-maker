@@ -10,6 +10,7 @@ import { download } from "./download.ts";
 import { EmbedView } from "./embed-view.ts";
 import { embedHtml } from "./embed.ts";
 import { decodeImage } from "./image.ts";
+import { bindResolutionGate } from "./resolution.ts";
 import { bindTooltips } from "./tooltips.ts";
 
 type Theme = "light" | "dark";
@@ -24,7 +25,7 @@ export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
-  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders");
+  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders"), resolutionTip = qs<HTMLElement>("#resolution-tip");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
@@ -165,7 +166,8 @@ export const startMaker = (): void => {
 
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
-  for (const control of [columns, contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
+  for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
+  bindResolutionGate(columns, columnsOut, resolutionTip, schedule);
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
@@ -179,7 +181,6 @@ export const startMaker = (): void => {
     schedule();
   });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
-  columns.addEventListener("input", () => { columnsOut.value = columns.value; });
   reset.addEventListener("click", () => {
     columns.value = "96";
     contrast.value = "1.12";
