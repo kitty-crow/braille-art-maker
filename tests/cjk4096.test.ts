@@ -1,11 +1,12 @@
 import { expect, test } from "bun:test";
-import { cjk4096Decode, cjk4096Encode, cjk4096Range } from "../src/embed/cjk4096.ts";
+import { cjk4096Decode, cjk4096Encode, cjk4096Range, type Cjk4096Remainder } from "../src/embed/cjk4096.ts";
 import { decodeU4, encodeU4, encodeU4Cjk, type U4Mode } from "../src/embed/codec.ts";
 import { packEmbedSmall, unpackEmbedSmall } from "../src/embed/small-bun.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 import type { Art } from "../src/types.ts";
 
 const bytes = (length: number): Uint8Array => Uint8Array.from({ length }, (_, index) => (index * 73 + index * index * 19 + 41) & 0xff);
+const modes: readonly U4Mode[] = ["r", "d", "b"];
 
 const noisyArt = (): Art => {
   const columns = 96;
@@ -40,7 +41,7 @@ test("CJK-4096 round-trips every byte remainder without hidden padding", () => {
   for (let length = 0; length <= 257; length += 1) {
     const source = bytes(length);
     const encoded = cjk4096Encode(source);
-    expect(encoded.remainder).toBe(length % 3);
+    expect(encoded.remainder).toBe((length % 3) as Cjk4096Remainder);
     expect(encoded.body.length).toBe(Math.ceil(length * 2 / 3));
     expect(cjk4096Decode(encoded.body, encoded.remainder)).toEqual(source);
   }
@@ -52,7 +53,7 @@ test("CJK-4096 alphabet survives all standard Unicode normalization forms", () =
 });
 
 test("u4 marks CJK transport explicitly and remains reversible for every compression mode", () => {
-  for (const mode of ["r", "d", "b"] as const satisfies readonly U4Mode[]) {
+  for (const mode of modes) {
     for (const length of [1, 2, 3, 4, 5, 96]) {
       const source = bytes(length);
       const packed = encodeU4Cjk(mode, source);
