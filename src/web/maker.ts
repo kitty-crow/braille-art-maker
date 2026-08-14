@@ -32,19 +32,23 @@ export const startMaker = (): void => {
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
 
-  const resolutionMax = 4096;
+  const resolutionMax = 2048;
   const resolutionMin = Number(columns.min);
   const notchPosition = (value: number): string => `${(value - resolutionMin) / (resolutionMax - resolutionMin) * 100}%`;
+  const addNotch = (value: number, className: string): void => {
+    const notch = document.createElement("span");
+    notch.className = `resolution-notch ${className}`;
+    notch.style.left = notchPosition(value);
+    notch.setAttribute("aria-hidden", "true");
+    resolutionRange.appendChild(notch);
+  };
   columns.max = String(resolutionMax);
-  columnsValue.max = columns.max;
+  columnsValue.removeAttribute("max");
   resolutionNotch.style.left = notchPosition(256);
-  const extremeNotch = document.createElement("span");
-  extremeNotch.className = "resolution-notch resolution-notch-extreme";
-  extremeNotch.style.left = notchPosition(765);
-  extremeNotch.setAttribute("aria-hidden", "true");
-  resolutionRange.appendChild(extremeNotch);
-  resolutionInfo.dataset.tip = "Controls horizontal Unicode cell count. Above 256 is experimental. Beyond 765 is extreme territory where memory, battery and browser limits become very real.";
-  resolutionInfo.setAttribute("aria-label", "About resolution. Above 256 cells is experimental; beyond 765 cells is extreme and may exhaust browser resources.");
+  addNotch(765, "resolution-notch-extreme");
+  addNotch(1024, "resolution-notch-ram");
+  resolutionInfo.dataset.tip = "Controls horizontal Unicode cell count. Above 256 is experimental. Beyond 765 is extreme territory; 1K and beyond puts serious pressure on browser memory. The slider stops at 2048, but larger values can be typed manually at your own risk.";
+  resolutionInfo.setAttribute("aria-label", "About resolution. Above 256 cells is experimental; beyond 765 is extreme, with a 1K memory warning. The slider stops at 2048, while larger values may be entered manually with confirmation.");
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
@@ -52,7 +56,7 @@ export const startMaker = (): void => {
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
   const makerCfg = (): ArtCfg => ({
-    columns: Number(columns.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
+    columns: Number(columnsValue.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
     colour: colour.checked, colourBackground: colour.checked && colourBg.checked, fullColour: colour.checked && colourBg.checked && fullColour.checked
   });
   const heroCfg = (): ArtCfg => heroColour.checked ? {
@@ -205,7 +209,9 @@ export const startMaker = (): void => {
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
-  bindResolutionGate(columns, columnsValue, resolutionTip, schedule);
+  bindResolutionGate(columns, columnsValue, resolutionTip, schedule, {
+    confirmAboveMax: value => window.confirm(`2K was the last stop. Are nya sure you want to keep going? Your RAM is already at the bus stop trying to get home.\n\nRequested resolution: ${value} cells. This is unsupported and may crash the tab.`),
+  });
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }

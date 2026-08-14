@@ -11,6 +11,7 @@ export interface ResolutionGateOpts {
   readonly resistancePx?: number;
   readonly message?: string;
   readonly gates?: readonly ResolutionGate[];
+  readonly confirmAboveMax?: (value: number, max: number) => boolean;
 }
 
 export const bindResolutionGate = (
@@ -33,13 +34,18 @@ export const bindResolutionGate = (
       resistancePx: resistance,
       message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself.",
     },
+    {
+      value: 1024,
+      resistancePx: resistance,
+      message: "1K? Are nya crazy?! I’d hate to be your RAM right meow!",
+    },
   ])].sort((a, b) => a.value - b.value);
   const min = Number(input.min);
   const max = Number(input.max);
   let pointer: number | null = null;
   let pointerX = 0;
   let pointerY = 0;
-  let committed = Number(input.value);
+  let committed = Number(valueInput.value || input.value);
   let passed = gates.filter(gate => committed > gate.value).length;
   let active: { readonly gate: ResolutionGate; readonly index: number; readonly x: number } | null = null;
 
@@ -64,18 +70,19 @@ export const bindResolutionGate = (
     return Math.round(min + ratio * (max - min));
   };
 
-  const normalise = (value: number): number => Math.round(clamp(value, min, max));
+  const normaliseSlider = (value: number): number => Math.round(clamp(value, min, max));
+  const normaliseManual = (value: number): number => Math.max(min, Math.round(value));
   const notchX = (): number => active?.x ?? pointerX;
 
-  const setValue = (value: number): boolean => {
-    const next = String(normalise(value));
-    const changed = input.value !== next;
+  const setSliderValue = (value: number): boolean => {
+    const next = String(normaliseSlider(value));
+    const changed = input.value !== next || valueInput.value !== next;
     input.value = next;
     valueInput.value = next;
     return changed;
   };
 
-  const commit = (): void => {
+  const commitSlider = (): void => {
     const next = Number(input.value);
     if (next === committed) return;
     committed = next;
@@ -99,29 +106,46 @@ export const bindResolutionGate = (
     const next = nextGate(desired);
     if (!next) return false;
     active = { ...next, x };
-    setValue(next.gate.value);
+    setSliderValue(next.gate.value);
     showTip(next.gate.message);
     return true;
   };
 
   const commitManual = (): void => {
     const requested = Number(valueInput.value);
-    const next = Number.isFinite(requested) ? normalise(requested) : Number(input.value);
-    setValue(next);
+    const next = Number.isFinite(requested) ? normaliseManual(requested) : committed;
+    if (next === committed) {
+      input.value = String(normaliseSlider(next));
+      valueInput.value = String(next);
+      syncPassed(next);
+      active = null;
+      hideTip();
+      return;
+    }
+    if (next > max && opts.confirmAboveMax && !opts.confirmAboveMax(next, max)) {
+      input.value = String(normaliseSlider(committed));
+      valueInput.value = String(committed);
+      active = null;
+      hideTip();
+      return;
+    }
+    input.value = String(normaliseSlider(next));
+    valueInput.value = String(next);
     syncPassed(next);
     active = null;
     hideTip();
-    commit();
+    committed = next;
+    onCommit();
   };
 
-  input.addEventListener("focus", () => { committed = Number(input.value); });
-  valueInput.addEventListener("focus", () => { committed = Number(input.value); });
+  input.addEventListener("focus", () => { committed = Number(valueInput.value || input.value); });
+  valueInput.addEventListener("focus", () => { committed = Number(valueInput.value || input.value); });
 
   input.addEventListener("pointerdown", event => {
     pointer = event.pointerId;
     pointerX = event.clientX;
     pointerY = event.clientY;
-    committed = Number(input.value);
+    committed = Number(valueInput.value || input.value);
     syncPassed(Number(input.value));
     active = null;
   });
@@ -140,8 +164,8 @@ export const bindResolutionGate = (
         return;
       }
 
-      if (event.clientX < notchX() + resistance) {
-        setValue(active.gate.value);
+      if (event.clientX < notchX() + (active.gate.resistancePx ?? resistance)) {
+        setSliderValue(active.gate.value);
         showTip(active.gate.message);
         return;
       }
@@ -150,11 +174,11 @@ export const bindResolutionGate = (
       active = null;
       hideTip();
       if (catchGate(desired, event.clientX)) return;
-      setValue(desired);
+      setSliderValue(desired);
       return;
     }
 
-    catchGate(desired, event.clientX);
+    if (!catchGate(desired, event.clientX)) setSliderValue(desired);
   });
 
   input.addEventListener("input", () => {
@@ -168,15 +192,14 @@ export const bindResolutionGate = (
     valueInput.value = input.value;
   });
 
-  input.addEventListener("change", commit);
+  input.addEventListener("change", commitSlider);
 
   valueInput.addEventListener("input", () => {
     if (!valueInput.value.trim()) return;
     const requested = Number(valueInput.value);
-    if (!Number.isFinite(requested) || requested < min || requested > max) return;
-    const next = normalise(requested);
-    input.value = String(next);
-    syncPassed(next);
+    if (!Number.isFinite(requested) || requested < min) return;
+    input.value = String(normaliseSlider(requested));
+    syncPassed(requested);
     active = null;
     hideTip();
   });
@@ -194,7 +217,7 @@ export const bindResolutionGate = (
     syncPassed(Number(input.value));
     active = null;
     hideTip();
-    commit();
+    commitSlider();
   };
   input.addEventListener("pointerup", finish);
   input.addEventListener("pointercancel", finish);

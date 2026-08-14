@@ -80,27 +80,32 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker gates the experimental 257-1024 range and allows direct numerical resolution entry", async () => {
+test("maker gates high resolutions, stops the slider at 2048 and allows confirmed manual values beyond it", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const gate = await readFile(join(root, "src", "web", "resolution.ts"), "utf8");
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
-  expect(html).toContain('Resolution <input id="columns-value" class="resolution-value" type="number" min="24" max="1024" step="1" value="96"');
-  expect(html).toContain('id="columns" type="range" min="24" max="1024" step="1" value="96"');
+  expect(html).toContain('Resolution <input id="columns-value" class="resolution-value" type="number" min="24" step="1" value="96"');
+  expect(html).not.toContain('id="columns-value" class="resolution-value" type="number" min="24" max=');
+  expect(html).toContain('id="columns" type="range" min="24" max="2048" step="1" value="96"');
   expect(html).toContain('class="resolution-notch"');
   expect(html).toContain('id="resolution-tip" class="slider-tip resolution-tip"');
-  expect(html).toContain('Resolutions above 256 cells are experimental and performance drops significantly.');
-  expect(maker).toContain('bindResolutionGate(columns, columnsValue, resolutionTip, schedule);');
-  expect(maker).toContain('columnsValue.value = columns.value;');
+  expect(maker).toContain('const resolutionMax = 2048;');
+  expect(maker).toContain('columnsValue.removeAttribute("max");');
+  expect(maker).toContain('confirmAboveMax: value => window.confirm');
+  expect(maker).toContain('2K was the last stop. Are nya sure you want to keep going?');
   expect(gate).toContain('const notch = opts.notch ?? 256;');
   expect(gate).toContain('const resistance = opts.resistancePx ?? 34;');
+  expect(gate).toContain('value: 765');
+  expect(gate).toContain('Beyond here, any-nyan ventures at their own risk.');
+  expect(gate).toContain('value: 1024');
+  expect(gate).toContain('1K? Are nya crazy?! I’d hate to be your RAM right meow!');
   expect(gate).toContain('valueInput.addEventListener("input"');
   expect(gate).toContain('valueInput.addEventListener("change", commitManual);');
-  expect(gate).toContain('event.clientX < notchX() + resistance');
-  expect(gate).toContain('performance drops significantly');
+  expect(gate).toContain('active.gate.resistancePx ?? resistance');
+  expect(gate).toContain('const normaliseManual = (value: number): number => Math.max(min, Math.round(value));');
   expect(css).toContain('.resolution-value');
   expect(css).toContain('.resolution-notch');
-  expect(css).toContain('left:23.2%');
 });
 
 test("maker keeps the non-resolution slider and colour defaults", async () => {

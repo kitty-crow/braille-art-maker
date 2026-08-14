@@ -38,6 +38,7 @@ test("very-high-resolution maker fallback bounds live DOM with seam-free fixed U
   const css = await read("web/styles/unicode.css");
   expect(dense).toContain("const chunkAbove = 768;");
   expect(dense).toContain("const chunkCells = 8;");
+  expect(dense).toContain("const chunkCellsFor = (columns: number): number =>");
   expect(dense).toContain('type DenseMode = "cells" | "rows" | "chunks";');
   expect(dense).toContain('return columns > chunkAbove ? "chunks" : "cells";');
   expect(dense).toContain('chunk.className = "unicode-chunk";');
@@ -123,16 +124,42 @@ test("high-resolution preview finishes before embed compression starts", async (
 
 test("resolution input commits rendering only after interaction settles", async () => {
   const gate = await read("src/web/resolution.ts");
-  expect(gate).toContain("const commit = (): void =>");
-  expect(gate).toContain('input.addEventListener("change", commit);');
+  expect(gate).toContain("const commitSlider = (): void =>");
+  expect(gate).toContain('input.addEventListener("change", commitSlider);');
   expect(gate).toContain('valueInput.addEventListener("change", commitManual);');
   expect(gate).toContain('valueInput.addEventListener("blur", commitManual);');
   expect(gate).toContain('if (event.key !== "Enter") return;');
-  expect(gate).toContain("commit();");
+  expect(gate).toContain("commitManual();");
   const inputHandler = gate.match(/input\.addEventListener\("input", \(\) => \{([\s\S]*?)\n  \}\);/u)?.[1] ?? "";
   expect(inputHandler).not.toContain("onCommit()");
   const numericHandler = gate.match(/valueInput\.addEventListener\("input", \(\) => \{([\s\S]*?)\n  \}\);/u)?.[1] ?? "";
   expect(numericHandler).not.toContain("onCommit()");
+});
+
+test("resolution gates include 765 and 1K jokes while manual values remain unbounded", async () => {
+  const html = await read("web/index.html");
+  const maker = await read("src/web/maker.ts");
+  const gate = await read("src/web/resolution.ts");
+  const size = await read("src/core/size.ts");
+  const art = await read("src/core/art.ts");
+  expect(html).toContain('id="columns" type="range" min="24" max="2048"');
+  expect(html).toContain('id="columns-value" class="resolution-value" type="number" min="24" step="1"');
+  expect(html).not.toContain('id="columns-value" class="resolution-value" type="number" min="24" max=');
+  expect(gate).toContain('value: 765');
+  expect(gate).toContain('Beyond here, any-nyan ventures at their own risk.');
+  expect(gate).toContain('value: 1024');
+  expect(gate).toContain('1K? Are nya crazy?! I’d hate to be your RAM right meow!');
+  expect(gate).toContain("const normaliseManual = (value: number): number => Math.max(min, Math.round(value));");
+  expect(gate).toContain("opts.confirmAboveMax(next, max)");
+  expect(maker).toContain("const resolutionMax = 2048;");
+  expect(maker).toContain('columnsValue.removeAttribute("max");');
+  expect(maker).toContain("columns: Number(columnsValue.value)");
+  expect(maker).toContain("2K was the last stop. Are nya sure you want to keep going?");
+  expect(maker).toContain("This is unsupported and may crash the tab.");
+  expect(size).toContain("export const maxColumns = 2048;");
+  expect(size).not.toContain("Math.min(maxColumns");
+  expect(art).not.toContain("Math.min(maxColumns");
+  expect(art).not.toContain("artSize, maxColumns, minColumns");
 });
 
 test("all source pages preserve the mobile viewport contract", async () => {
