@@ -35,6 +35,10 @@ const cancelWorker = (error: Error): void => {
   pending.clear();
 };
 
+export const cancelEmbedHtml = (): void => {
+  if (pending.size > 0 || worker) cancelWorker(new Error("Embed generation superseded."));
+};
+
 const getWorker = (): Worker => {
   if (worker) return worker;
   const workerUrl = new URL("embed-worker.js", import.meta.url);
@@ -69,7 +73,7 @@ export const embedHtml = (
 ): Promise<string> => new Promise((resolve, reject) => {
   // Only the newest generated art matters in the maker. Killing stale work also releases
   // any large Brotli/WASM allocation before a new high-resolution encode begins.
-  if (pending.size > 0) cancelWorker(new Error("Embed generation superseded."));
+  cancelEmbedHtml();
 
   const id = ++nextId;
   const oneShot = art.columns > transferAbove;
