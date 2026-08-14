@@ -9,15 +9,19 @@ interface DenseSource {
   readonly rows: number;
 }
 
+type DenseMode = "cells" | "rows" | "chunks";
+
 interface DenseState {
   readonly source: DenseSource;
-  mode: "cells" | "rows" | null;
+  mode: DenseMode | null;
   family: string | null;
   rendering: boolean;
   generation: number;
 }
 
 const compactAbove = 256;
+const chunkAbove = 768;
+const chunkCells = 8;
 const paintBudgetMs = 12;
 const state = new WeakMap<HTMLElement, DenseState>();
 const taskChannel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
@@ -145,6 +149,35 @@ const fillCompactRow = (row: HTMLElement, source: DenseSource, y: number, defaul
   row.replaceChildren(ink);
 };
 
+const fillChunkRow = (row: HTMLElement, source: DenseSource, y: number, defaultFg: string): void => {
+  const chars = [...padded(source, y)];
+  const fragment = document.createDocumentFragment();
+  for (let x = 0; x < source.columns; x += chunkCells) {
+    const count = Math.min(chunkCells, source.columns - x);
+    const chunk = document.createElement("span");
+    chunk.className = "unicode-chunk";
+    chunk.style.gridColumn = `span ${count}`;
+    const text = chars.slice(x, x + count).join("");
+    if (!source.colours) {
+      chunk.textContent = text;
+      fragment.appendChild(chunk);
+      continue;
+    }
+
+    const offset = y * source.columns + x;
+    const bg = gradient(source.colours, offset, count, true, "transparent");
+    const fg = gradient(source.colours, offset, count, false, defaultFg);
+    if (bg) chunk.style.backgroundImage = bg;
+    const ink = document.createElement("span");
+    ink.className = fg ? "unicode-ink unicode-ink-colour" : "unicode-ink";
+    ink.textContent = text;
+    if (fg) ink.style.backgroundImage = fg;
+    chunk.appendChild(ink);
+    fragment.appendChild(chunk);
+  }
+  row.replaceChildren(fragment);
+};
+
 const rowShells = (host: HTMLElement, rows: number): HTMLElement[] => {
   const fragment = document.createDocumentFragment();
   const out: HTMLElement[] = [];
@@ -173,6 +206,19 @@ const renderRows = (host: HTMLElement, source: DenseSource, fit: BrailleFontFit)
   host.style.fontFamily = fit.family;
 };
 
+const renderChunks = (host: HTMLElement, source: DenseSource): void => {
+  const rows = rowShells(host, source.rows);
+  const defaultFg = getComputedStyle(host).color || "#201d24";
+  for (let y = 0; y < source.rows; y += 1) fillChunkRow(rows[y]!, source, y, defaultFg);
+  host.dataset.unicodeRender = "chunks";
+  host.style.removeProperty("font-family");
+};
+
+const modeFor = (columns: number, fit: BrailleFontFit | null): DenseMode => {
+  if (fit) return "rows";
+  return columns > chunkAbove ? "chunks" : "cells";
+};
+
 const renderInterlaced = async (
   host: HTMLElement,
   current: DenseState,
@@ -181,23 +227,24 @@ const renderInterlaced = async (
   const generation = ++current.generation;
   current.rendering = true;
   const rows = rowShells(host, current.source.rows);
-  const compact = fit !== null;
+  const mode = modeFor(current.source.columns, fit);
   const defaultFg = getComputedStyle(host).color || "#201d24";
   let sliceStart = performance.now();
 
-  host.dataset.unicodeRender = compact ? "rows" : "cells";
+  host.dataset.unicodeRender = mode;
   if (fit) host.style.fontFamily = fit.family;
   else host.style.removeProperty("font-family");
 
   try {
     // Interlaced progressive final render: even rows establish image-wide detail, then odd
-    // rows complete it. Yield only when actual work consumes the cooperative time budget;
-    // fast renders finish synchronously with no artificial frame waits or minimum duration.
+    // rows complete it. Very-high-resolution exact fallback is chunked into fixed grid spans
+    // so the whole image remains genuine Unicode without a half-million live cell elements.
     for (const parity of [0, 1] as const) {
       for (let y = parity; y < current.source.rows; y += 2) {
         if (state.get(host) !== current || current.generation !== generation) return;
         const row = rows[y]!;
-        if (fit) fillCompactRow(row, current.source, y, defaultFg);
+        if (mode === "rows") fillCompactRow(row, current.source, y, defaultFg);
+        else if (mode === "chunks") fillChunkRow(row, current.source, y, defaultFg);
         else fillCellRow(row, current.source, y);
         if (performance.now() - sliceStart >= paintBudgetMs) {
           await yieldBrowser();
@@ -217,11 +264,12 @@ const applyGeometry = (host: HTMLElement, current: DenseState, allowRender: bool
   if (!(target > 0)) return null;
 
   const fit = columns > compactAbove ? exactBrailleFont(host, target) : null;
-  const mode: "cells" | "rows" = fit ? "rows" : "cells";
+  const mode = modeFor(columns, fit);
   const family = fit?.family ?? null;
 
   if (allowRender && !current.rendering && (current.mode !== mode || (mode === "rows" && current.family !== family))) {
-    if (fit) renderRows(host, current.source, fit);
+    if (mode === "rows" && fit) renderRows(host, current.source, fit);
+    else if (mode === "chunks") renderChunks(host, current.source);
     else renderCells(host, current.source);
     current.mode = mode;
     current.family = family;
@@ -251,7 +299,7 @@ export const renderDense = async (host: HTMLElement, source: string | Art): Prom
   host.style.setProperty("--rows", String(next.rows));
 
   const fit = applyGeometry(host, current, false);
-  const mode: "cells" | "rows" = fit ? "rows" : "cells";
+  const mode = modeFor(next.columns, fit);
   current.mode = mode;
   current.family = fit?.family ?? null;
 
