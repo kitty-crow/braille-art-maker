@@ -20,9 +20,9 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 256 horizontal Unicode cells.
 
-The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
+The hero starts in colour at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
 The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. The canvas control reads **Dark canvas** in light mode and **Light canvas** in dark mode, reversing its checkbox action so the label always describes what enabling it will do. It starts from the visibility-friendly automatic choice, but once changed manually the maker keeps the actual selected canvas. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
 
@@ -52,7 +52,7 @@ bun run cli -- image.png --colour --embed -o image-embed.html
 Useful options:
 
 ```text
---columns <n>          Unicode columns, default 96
+--columns <n>          Unicode columns, 8-256, default 96
 --dither <mode>        atkinson|floyd|ordered|threshold, default ordered
 --invert               inverted polarity, default
 --no-invert            disable inverted polarity
