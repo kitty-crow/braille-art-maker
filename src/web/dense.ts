@@ -1,4 +1,4 @@
-import type { Art, CellColour } from "../types.ts";
+import type { Art, CellColour, Rgb } from "../types.ts";
 import { rgbHex } from "../colour/space.ts";
 
 const innerSize = (element: HTMLElement): { width: number; height: number } => {
@@ -34,31 +34,57 @@ export const fitDense = (host: HTMLElement): void => {
   host.style.height = `${rows * target * 2}px`;
 };
 
-const paint = (cell: HTMLElement, colour?: CellColour): void => {
-  if (colour?.fg) cell.style.color = rgbHex(colour.fg);
-  if (colour?.bg) cell.style.backgroundColor = rgbHex(colour.bg);
+const sameRgb = (a?: Rgb, b?: Rgb): boolean => (!a && !b) || (!!a && !!b && a.r === b.r && a.g === b.g && a.b === b.b);
+const sameColour = (a?: CellColour, b?: CellColour): boolean => sameRgb(a?.fg, b?.fg) && sameRgb(a?.bg, b?.bg);
+
+const paint = (run: HTMLElement, colour?: CellColour): void => {
+  if (colour?.fg) run.style.color = rgbHex(colour.fg);
+  if (colour?.bg) run.style.backgroundColor = rgbHex(colour.bg);
+};
+
+const appendColourRuns = (row: HTMLElement, chars: readonly string[], colours: readonly CellColour[] | undefined, offset: number, columns: number): void => {
+  let start = 0;
+  while (start < columns) {
+    const colour = colours?.[offset + start];
+    let end = start + 1;
+    while (end < columns && sameColour(colour, colours?.[offset + end])) end += 1;
+    const run = document.createElement("span");
+    run.className = "unicode-run";
+    run.textContent = chars.slice(start, end).join("");
+    run.style.setProperty("--run-cells", String(end - start));
+    paint(run, colour);
+    row.appendChild(run);
+    start = end;
+  }
+};
+
+const stringColumns = (lines: readonly string[]): number => {
+  let columns = 1;
+  for (const line of lines) columns = Math.max(columns, [...line].length);
+  return columns;
 };
 
 export const renderDense = (host: HTMLElement, source: string | Art): void => {
   const text = typeof source === "string" ? source : source.text;
   const colours = typeof source === "string" ? undefined : source.cellColours;
   const lines = text.split("\n");
-  const columns = typeof source === "string" ? Math.max(1, ...lines.map(line => [...line].length)) : source.columns;
+  const columns = typeof source === "string" ? stringColumns(lines) : source.columns;
+  const rows = typeof source === "string" ? Math.max(1, lines.length) : source.rows;
+  const fragment = document.createDocumentFragment();
+
   host.replaceChildren();
   host.style.setProperty("--cols", String(columns));
-  host.style.setProperty("--rows", String(typeof source === "string" ? Math.max(1, lines.length) : source.rows));
-  let ci = 0;
-  for (const line of lines) {
+  host.style.setProperty("--rows", String(rows));
+
+  for (let y = 0; y < rows; y += 1) {
     const row = document.createElement("div");
     row.className = "unicode-row";
-    for (const char of line.padEnd(columns, "⠀")) {
-      const cell = document.createElement("span");
-      cell.className = "unicode-cell";
-      cell.textContent = char;
-      paint(cell, colours?.[ci++]);
-      row.appendChild(cell);
-    }
-    host.appendChild(row);
+    const chars = [...(lines[y] ?? "").padEnd(columns, "⠀")].slice(0, columns);
+    if (!colours) row.textContent = chars.join("");
+    else appendColourRuns(row, chars, colours, y * columns, columns);
+    fragment.appendChild(row);
   }
+
+  host.appendChild(fragment);
   fitDense(host);
 };
