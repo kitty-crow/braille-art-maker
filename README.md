@@ -20,11 +20,13 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls.
 
 The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Foreground-only colour uses the dark preview surface in light mode so the result remains visible; the adjacent `?` explains that a genuinely light surface can make some colours difficult to see.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Light foreground-only colour uses the dark preview surface and automatically inverts polarity to match it; light monochrome/background-coloured output starts non-inverted, while dark mode starts inverted. The Invert checkbox remains manually adjustable afterward.
+
+**Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither and polarity untouched.
 
 The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer.
 

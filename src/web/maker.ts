@@ -25,7 +25,7 @@ export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
-  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert");
+  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), reset = qs<HTMLButtonElement>("#reset-sliders");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
   const embedView = new EmbedView(embedCode);
@@ -125,6 +125,14 @@ export const startMaker = (): void => {
   for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(true); schedule(); });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   columns.addEventListener("input", () => { columnsOut.value = columns.value; });
+  reset.addEventListener("click", () => {
+    columns.value = "96";
+    contrast.value = "1.12";
+    detail.value = "0.34";
+    bias.value = "0.015";
+    columnsOut.value = columns.value;
+    schedule();
+  });
   addEventListener("unicode-art-theme", event => {
     const theme = (event as CustomEvent<Theme>).detail;
     if (theme === "light" || theme === "dark") applyThemeDefaults(theme);
