@@ -1,115 +1,132 @@
-# GitHub Pages Template
+# Braille Art Maker
 
-Unbranded GitHub Pages build, runtime and component foundation for static web applications.
+Turn PNG images into dense Unicode Braille art through a real path-only SVG stage.
 
-It covers Pages concerns only. Application logic, domain code, page content, project branding and project-specific CSS remain in the consuming repository.
+The browser app runs locally at [kitty-crow.github.io/braille-art-maker](https://kitty-crow.github.io/braille-art-maker/). The same repository also provides a Bun CLI and a small library for the image-to-Braille stages.
 
-## Use as a pinned submodule
+## What it does
 
-```bash
-git submodule add https://github.com/kitty-crow/github-pages-template vendor/pages
-git -C vendor/pages checkout <commit-sha>
-git add .gitmodules vendor/pages
-```
+The conversion is intentionally split into distinct stages:
 
-The parent repository records the exact template commit. Updating the shared layer is an explicit submodule pointer change.
+1. Decode the PNG.
+2. Convert it to a path-only SVG with the pinned [Vectoriser](https://github.com/kitty-crow/vectoriser) dependency.
+3. Rasterise that SVG at the exact Braille dot-grid size.
+4. Build a transparency-aware luminance signal.
+5. Stretch useful contrast and recover fine edges with a Sobel pass.
+6. Halftone the signal with Atkinson, Floyd-Steinberg, ordered 4×4 or a hard threshold.
+7. Pack each 2×4 dot block into one Unicode Braille character.
+8. Render the characters with the dense-cell technique from [Braille QR](https://github.com/kitty-crow/braille-qr).
 
-## Commands
+The PNG-to-Braille analysis, dithering and Unicode packing are implemented in this repository. Vertopal was used as a behavioural reference while investigating the UBRL output class, not as code or a runtime dependency. See [Reverse engineering notes](docs/reverse-engineering.md).
 
-```bash
-bun vendor/pages/src/cli.ts check pages.config.ts
-bun vendor/pages/src/cli.ts build pages.config.ts
-bun vendor/pages/src/cli.ts version patch
-```
-
-Create a neutral starter:
+## Browser
 
 ```bash
-bun vendor/pages/src/cli.ts init . \
-  --name "Project" \
-  --repo owner/project \
-  --base /project/
+git clone --recurse-submodules https://github.com/kitty-crow/braille-art-maker
+cd braille-art-maker
+bun install
+bun run check
+bun run build
+bun src/serve.ts
 ```
 
-The scaffold contains separate Home, About, README and 404 pages, clean routes, version loading, theme controls, responsive shell styles and Pages workflows. Ko-fi is disabled unless `--kofi <user>` is supplied.
+Open `http://localhost:4173`.
 
-## Configuration
+The default hero fixture is a web-optimised PNG derived from the supplied example. The hero overlays its generated Braille result on the same square behind a draggable top-to-bottom divider, so source features and Braille features remain spatially registered. The fixture is deliberately demanding, with transparency, pale hair, dark clothing, thin linework and shaded surfaces.
+
+## CLI
+
+Build first:
+
+```bash
+bun install
+bun run build
+```
+
+Then:
+
+```bash
+braille-art image.png
+braille-art image.png --columns 120 --dither atkinson
+braille-art image.png --html -o image.html
+braille-art image.png --svg intermediate.svg -o image.txt
+```
+
+From a checkout without installing the binary:
+
+```bash
+bun src/cli.ts image.png --columns 96
+```
+
+The CLI invokes the pinned Vectoriser core for the first stage. It preserves the full source canvas by default (`--crop` is available when desired), then uses `@resvg/resvg-js` as a generic SVG renderer before entering this repository's own signal, halftone and Unicode packing code.
+
+## Library
 
 ```ts
-import { definePages } from "./vendor/pages/src/index.ts";
+import { makeArt } from "@kitty-crow/braille-art-maker";
 
-export default definePages({
-  source: "web",
-  out: "site",
-  pages: [
-    { from: "index.html", route: "/" },
-    { from: "about.html", route: "/about/", legacy: ["about.html"] },
-    { from: "readme.html", route: "/readme/", legacy: ["readme.html"] }
-  ],
-  runtime: {
-    base: "/project/",
-    theme: {
-      key: "project.theme",
-      colours: { light: "#f5f6f8", dark: "#11131a" }
-    },
-    version: { file: "version.json" },
-    readme: { owner: "owner", repo: "project" }
-  }
+const art = makeArt({ width, height, data: rgba }, {
+  contrast: 1.08,
+  detail: 0.22,
+  bias: 0.03,
+  dither: "atkinson",
+  polarity: "dark"
 });
+
+console.log(art.text);
 ```
 
-See [Configuration](docs/config.md).
+The library starts from RGBA pixels at the final Braille dot-grid resolution. PNG decoding, vectorisation and SVG rendering remain adapters around that core.
 
-## Shared Pages elements
+## Pinned vendor dependencies
 
-- early theme boot with OS preference detection and persisted override
-- generic light/dark controls and optional theme events
-- responsive Ko-fi overlay placement and footer link
-- version text loaded from an independent JSON file
-- sanitised README rendering with link and image rewriting
-- clean-route compilation and optional legacy redirects
-- `.nojekyll`, 404 and Pages artefact support
-- neutral shell, navigation, field, button, panel, footer and Markdown styles
-- reusable and copyable GitHub Actions workflows
+Three repositories are git submodules rather than copied source:
 
-Every runtime feature is optional. Selectors, storage keys, colours, repository details and donation account are supplied by the consuming project.
+```text
+vendor/pages       kitty-crow/github-pages-template
+vendor/vectoriser  kitty-crow/vectoriser
+vendor/braille-qr  kitty-crow/braille-qr
+```
 
-## CSS
+`github-pages-template` provides the Pages builder/runtime. `vectoriser` provides the PNG-to-path-SVG implementation and CLI. `braille-qr` provides the dense HTML ink-spread helper and is the reference implementation for measured Braille cell geometry.
 
-Shared CSS is stored under `web/styles/`, separated by concern, strongly indented and written with native `&` nesting. `web/styles.css` is the complete index.
+## Output density
 
-Consumers select only the files they need. Project CSS remains local and loads after the shared layer, so an existing visual state can be retained exactly.
+Ordinary `<pre>` output leaves glyph metrics to the font and often looks loose. Dense HTML instead measures the rendered width of `⣿`, fixes every character to that width, fixes every row to twice that width, disables ligatures, uses geometric text rendering and allows glyph ink to overflow the microscopic cell box. Optional text shadow expands the ink by a controlled fraction of a pixel.
 
-See [CSS](docs/css.md).
+The underlying text remains normal Unicode Braille and can be copied without the HTML.
 
-## Existing sites
+## Documentation
 
-Adoption is parity-first. Keep the current HTML and CSS, add the submodule, compile only the shared runtime pieces needed, and remove duplicated code after the built output matches the current site.
-
-See [Adoption](docs/adoption.md) and [Submodules](docs/submodule.md).
-
-## Workflows
-
-The repository includes reusable `pages.yml` and `version.yml` workflows. The scaffold also contains standalone workflows that call the pinned local submodule. Version commits use `[skip ci]` so the version workflow can deploy without triggering a second Pages run.
-
-See [Workflows](docs/workflows.md).
+- [Architecture](docs/architecture.md)
+- [Conversion algorithm](docs/algorithm.md)
+- [Browser and hero](docs/web.md)
+- [CLI and library](docs/cli.md)
+- [Dependencies and vendor boundaries](docs/dependencies.md)
+- [Reverse engineering notes](docs/reverse-engineering.md)
 
 ## Project layout
 
 ```text
-src/          strict TypeScript builder, CLI and browser runtime
-web/styles/   optional concern-separated shared CSS
-scaffold/     neutral starter copied by the init command
-docs/         adoption and implementation documentation
-tests/        Bun tests
-example/      buildable neutral example
+src/                 Braille Art Maker core, CLI, browser app and build
+web/                 authored GitHub Pages HTML, CSS and hero fixture
+tests/               deterministic Bun tests
+docs/                architecture and reverse-engineering notes
+vendor/               pinned git submodules
+pages.config.ts       shared Pages-template configuration
+version.json          site/package version source
 ```
 
-## Author
+## Development
 
-Kitty Crow  
-https://kittycrow.dev
+```bash
+bun run check
+bun run build
+bun test
+```
+
+CI checks TypeScript, tests, the Pages configuration and version consistency before deploying `site/` to GitHub Pages.
 
 ## Licence
 
-[MIT](LICENSE)
+Braille Art Maker is MIT licensed. Vendored submodules and npm dependencies retain their own licences. In particular, `@resvg/resvg-js` is MPL-2.0 and `pngjs` is MIT.
