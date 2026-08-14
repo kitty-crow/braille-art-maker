@@ -165,7 +165,7 @@ test("maker persists the latest compact art and finished embed in IndexedDB", as
   expect(store).toContain('transaction.objectStore(artStore).put(payload, latestKey);');
   expect(store).toContain('html: new Blob([html]');
   expect(store).not.toContain('.put(art,');
-  expect(maker).toContain('const cachedRaw = new Blob([raw]');
+  expect(maker).toContain('const cachedRaw = new Blob([raw.buffer as ArrayBuffer]');
   expect(maker).toContain('storeCachedArt(__WEB_VERSION__');
   expect(maker).toContain('storeCachedEmbed(__WEB_VERSION__');
   expect(maker).toContain('loadCachedArt(__WEB_VERSION__)');
