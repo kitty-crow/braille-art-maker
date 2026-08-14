@@ -15,13 +15,23 @@ declare global {
 }
 
 const compactAbove = 256;
+const paintBudgetMs = 12;
 const runtimeSrc = document.currentScript instanceof HTMLScriptElement ? document.currentScript.src : "";
 const runtimeCss = runtimeSrc ? new URL("embed.css", runtimeSrc).href : "";
 const css = (rgb: Rgb): string => `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
 const codecFromMarker = (marker: string): EmbedCodec | null => marker === "1" || marker === "2" || marker === "3" || marker === "4" ? `u${marker}` as EmbedCodec : null;
 const sameRgb = (a?: Rgb, b?: Rgb): boolean => (!a && !b) || (!!a && !!b && a.r === b.r && a.g === b.g && a.b === b.b);
 const pct = (index: number, columns: number): string => `${Number((index * 100 / columns).toFixed(6))}%`;
-const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));
+const taskChannel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
+const taskQueue: Array<() => void> = [];
+if (taskChannel) taskChannel.port1.onmessage = () => taskQueue.shift()?.();
+
+const yieldBrowser = (): Promise<void> => {
+  const scheduler = (globalThis as typeof globalThis & { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (scheduler?.yield) return scheduler.yield();
+  if (taskChannel) return new Promise(resolve => { taskQueue.push(resolve); taskChannel.port2.postMessage(0); });
+  return new Promise(resolve => setTimeout(resolve, 0));
+};
 
 const gradient = (
   colours: readonly CellColour[] | undefined,
@@ -181,29 +191,26 @@ class View {
     this.painting = true;
     const rows = this.rowShells(payload);
     const compact = fit !== null;
-    const batch = compact ? 12 : Math.max(1, Math.floor(2048 / payload.columns));
+    let sliceStart = performance.now();
     this.grid.dataset.unicodeRender = compact ? "rows" : "cells";
     if (fit) this.grid.style.fontFamily = fit.family;
     else this.grid.style.removeProperty("font-family");
 
     try {
-      // Build the final target-resolution Unicode DOM progressively. Even rows establish
-      // image-wide detail first; odd rows then complete it. No lower-resolution rendering
-      // is computed and discarded.
+      // Build the final target-resolution Unicode DOM progressively. Yield only if actual
+      // rendering work consumes the cooperative budget; fast processors incur no mandatory
+      // frame waits and may complete before progressive filling is perceptible.
       for (const parity of [0, 1] as const) {
-        let sinceYield = 0;
         for (let y = parity; y < payload.rows; y += 2) {
           if (this.payload !== payload || paintGeneration !== this.paintGeneration) return;
           const row = rows[y]!;
           if (fit) this.fillCompactRow(row, payload, y);
           else this.fillCellRow(row, payload, y);
-          sinceYield += 1;
-          if (sinceYield >= batch) {
-            sinceYield = 0;
-            await nextFrame();
+          if (performance.now() - sliceStart >= paintBudgetMs) {
+            await yieldBrowser();
+            sliceStart = performance.now();
           }
         }
-        await nextFrame();
       }
     } finally {
       if (this.payload === payload && paintGeneration === this.paintGeneration) {
