@@ -33,6 +33,11 @@ export const bindResolutionGate = (
       resistancePx: resistance,
       message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself.",
     },
+    {
+      value: 1024,
+      resistancePx: resistance,
+      message: "1K? Are nya crazy?! I’d hate to be your RAM right meow!",
+    },
   ])].sort((a, b) => a.value - b.value);
   const min = Number(input.min);
   const max = Number(input.max);
@@ -140,7 +145,7 @@ export const bindResolutionGate = (
         return;
       }
 
-      if (event.clientX < notchX() + resistance) {
+      if (event.clientX < notchX() + (active.gate.resistancePx ?? resistance)) {
         setValue(active.gate.value);
         showTip(active.gate.message);
         return;
