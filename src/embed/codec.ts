@@ -3,11 +3,14 @@ import type { Art, ArtCfg } from "../types.ts";
 import { base85Decode, base85Encode } from "./base85.ts";
 import { base91Decode, base91Encode } from "./base91.ts";
 import { cjk4096Decode, cjk4096Encode, type Cjk4096Remainder } from "./cjk4096.ts";
+import { j8192Decode, j8192Encode, type J8192Remainder } from "./j8192.ts";
 import { isRawPayload, packRawV1, packRawV2Candidates, unpackRaw, type PackedEmbed, type RawCandidate } from "./raw.ts";
 
 export type EmbedCodec = "u1" | "u2" | "u3" | "u4";
 export type U4Mode = "r" | "d" | "b";
 export const embedCodec: EmbedCodec = "u4";
+
+const jRemainders = "0123456789ABC";
 
 const b64 = (bytes: Uint8Array): string => {
   let binary = "";
@@ -65,9 +68,16 @@ export const encodeU4 = (mode: U4Mode, bytes: Uint8Array): string => {
   return mode === "b" ? body : `&${mode}${body}`;
 };
 
+// Legacy 0.4.28 CJK-4096 encoder is kept exported so old callers remain source-compatible.
 export const encodeU4Cjk = (mode: U4Mode, bytes: Uint8Array): string => {
   const encoded = cjk4096Encode(bytes);
   return `&${mode.toUpperCase()}${encoded.remainder}${encoded.body}`;
+};
+
+export const encodeU4J = (mode: U4Mode, bytes: Uint8Array): string => {
+  const encoded = j8192Encode(bytes);
+  const marker = mode === "r" ? "J" : mode === "d" ? "K" : "L";
+  return `&${marker}${jRemainders[encoded.remainder]}${encoded.body}`;
 };
 
 export const decodeU4 = (source: string): { mode: U4Mode; bytes: Uint8Array } => {
@@ -76,6 +86,13 @@ export const decodeU4 = (source: string): { mode: U4Mode; bytes: Uint8Array } =>
   if (!text.startsWith("&")) return { mode: "b", bytes: base91Decode(text) };
 
   const marker = text[1];
+  if (marker === "J" || marker === "K" || marker === "L") {
+    const remainder = jRemainders.indexOf(text[2] ?? "");
+    if (remainder < 0) throw new Error("Packed Unicode u4 J8192 payload has invalid padding metadata.");
+    const mode: U4Mode = marker === "J" ? "r" : marker === "K" ? "d" : "b";
+    return { mode, bytes: j8192Decode(text.slice(3), remainder as J8192Remainder) };
+  }
+
   if (marker === "R" || marker === "D" || marker === "B") {
     const remainderText = text[2];
     if (remainderText !== "0" && remainderText !== "1" && remainderText !== "2") {
