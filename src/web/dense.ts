@@ -21,12 +21,16 @@ interface DenseState {
 
 const compactAbove = 256;
 const chunkAbove = 768;
-const chunkCells = 8;
 const paintBudgetMs = 12;
 const state = new WeakMap<HTMLElement, DenseState>();
 const taskChannel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
 const taskQueue: Array<() => void> = [];
 if (taskChannel) taskChannel.port1.onmessage = () => taskQueue.shift()?.();
+
+const chunkCellsFor = (columns: number): number => {
+  const scaled = 8 * (columns / 1024) ** 2;
+  return Math.max(8, Math.ceil(scaled / 8) * 8);
+};
 
 const yieldBrowser = (): Promise<void> => {
   const scheduler = (globalThis as typeof globalThis & { scheduler?: { yield?: () => Promise<void> } }).scheduler;
@@ -152,6 +156,7 @@ const fillCompactRow = (row: HTMLElement, source: DenseSource, y: number, defaul
 const fillChunkRow = (row: HTMLElement, source: DenseSource, y: number, defaultFg: string): void => {
   const chars = [...padded(source, y)];
   const fragment = document.createDocumentFragment();
+  const chunkCells = chunkCellsFor(source.columns);
 
   if (source.colours) {
     const bg = gradient(source.colours, y * source.columns, source.columns, true, "transparent");
