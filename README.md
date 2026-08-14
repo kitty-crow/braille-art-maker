@@ -28,9 +28,17 @@ The maker starts monochrome at the original slider defaults with Ordered 4x4. En
 
 **Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
 
+### High-resolution memory behaviour
+
+High resolutions remain genuine Unicode. The maker does **not** rasterise the preview and the embed runtime does **not** turn the result into an image.
+
+The live preview renders one Unicode text row per output row instead of one DOM element per cell. Colour foreground/background is painted with exact hard-stop CSS gradients aligned to Unicode-cell boundaries, so the underlying content is still selectable/copyable Unicode text while the DOM stays small even at 1024 columns.
+
+Above 256 columns, the current generated `Art` object is stored in IndexedDB after the visible Unicode rows have been rendered. The main page then releases its heavy in-memory art state. Copy/TXT/HTML actions load the current art on demand, and the embed worker reads the same cached art directly from IndexedDB rather than deep-cloning a very large colour-object graph from the page into the Worker.
+
 Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
-The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Compact embed optimisation runs in a Worker and reports progress in the maker.
+The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js for normal-sized outputs. Very large generated fragments stay as one plain `<pre><code>` text node instead of being duplicated through a Markdown/sanitiser/highlighter pipeline. Compact embed optimisation runs in a Worker and reports progress in the maker.
 
 Colour modes:
 
@@ -73,11 +81,13 @@ Useful options:
 
 The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-`u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
+For outputs through 256 columns, `u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
 
-Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. The actual shortest final payload wins. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
+For outputs above 256 columns, `u4` switches to a bounded-memory lossless path: one strong packed representation is evaluated as raw, maximum-DEFLATE and Brotli-11, and the shortest complete transport wins. This avoids materialising dozens of full-resolution candidate buffers and avoids JavaScript argument-list limits while preserving every Unicode cell and colour value exactly.
 
-The final bytes use a safe basE91 transport. Brotli is the implicit/default transport with no extra marker; raw or DEFLATE are selected only when their complete encoded payload is genuinely shorter. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
+The final bytes use a safe basE91 transport. Brotli is the implicit/default transport with no extra marker byte; raw or DEFLATE are selected only when their complete encoded payload is genuinely shorter. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
+
+The embed runtime uses the same real-Unicode row strategy as the maker: it decodes the payload to Unicode text rows, applies exact per-cell foreground/background paint with CSS gradients, then releases the decoded cell-object payload rather than retaining a DOM element for every cell. Theme/surface changes update CSS surface variables without re-decoding the payload.
 
 New copied embeds contain only the readable outer host attributes, one self-identifying single-line payload script and one loader script. The repeated Shadow DOM template, stylesheet link and API URL are no longer copied into every fragment: `embed.js` reconstructs the internal scaffold and stylesheet, while `load.js` derives the API URL from its own URL. The decoder remains part of this repository and is bundled into the published runtime.
 
@@ -125,7 +135,7 @@ src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
 src/embed/       packed/compressed embed codec, generator and browser runtime
-src/web/         browser behaviour and embed worker
+src/web/         browser behaviour, IndexedDB high-res backing and embed worker
 src/cli/         CLI parsing and output
 templates/embed/ paste-ready embed host, CSS and loader
 extras/term/     generic C colour header and terminal viewer
