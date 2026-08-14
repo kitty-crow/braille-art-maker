@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { packEmbed, unpackEmbed } from "../src/embed/codec.ts";
+import { packU4 } from "../src/embed/ultra-search.ts";
 import { packUltraCandidates, unpackUltra } from "../src/embed/ultra-raw.ts";
 import type { Art, ArtCfg, CellColour } from "../src/types.ts";
 
@@ -87,4 +88,23 @@ test("ultra embed dimensions preserve 1024 horizontal cells", () => {
   expect(decoded.columns).toBe(1024);
   expect(decoded.rows).toBe(1);
   expect(decoded.masks).toHaveLength(1024);
+});
+
+test("1024-column u4 packing stays bounded instead of expanding giant candidate arrays", () => {
+  const columns = 1024;
+  const rows = 512;
+  const line = "⠀".repeat(columns);
+  const art: Art = {
+    text: Array.from({ length: rows }, () => line).join("\n"),
+    columns,
+    rows,
+    dotsWidth: columns * 2,
+    dotsHeight: rows * 4,
+    threshold: 0.5,
+    density: 0,
+  };
+  const progress: { done: number; total: number }[] = [];
+  const packed = packU4(art, {}, bytes => bytes, value => progress.push(value));
+  expect(packed.length).toBeGreaterThan(0);
+  expect(progress.at(-1)).toEqual({ done: 3, total: 3 });
 });
