@@ -4,12 +4,7 @@
 
   if (!(script instanceof HTMLScriptElement) || !(host instanceof HTMLElement)) return;
 
-  const src = script.dataset.api;
-  if (!src) {
-    host.textContent = "Unicode Art API URL is missing.";
-    return;
-  }
-
+  const src = script.dataset.api || new URL("embed.js", script.src).href;
   const key = "__unicodeArtLoad";
   const win = window;
   const ready = win.UnicodeArt

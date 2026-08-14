@@ -12,7 +12,10 @@ declare global {
   }
 }
 
+const runtimeSrc = document.currentScript instanceof HTMLScriptElement ? document.currentScript.src : "";
+const runtimeCss = runtimeSrc ? new URL("embed.css", runtimeSrc).href : "";
 const css = (rgb: { readonly r: number; readonly g: number; readonly b: number }): string => `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
+const codecFromMarker = (marker: string): EmbedCodec | null => marker === "1" || marker === "2" || marker === "3" || marker === "4" ? `u${marker}` as EmbedCodec : null;
 
 class View {
   private readonly root: ShadowRoot;
@@ -44,9 +47,8 @@ class View {
     try {
       const payload = await this.readPayload();
       if (generation !== this.generation) return;
-      const tpl = this.host.querySelector<HTMLTemplateElement>("template[data-unicode-art-template]");
-      if (!tpl) throw new Error("Unicode Art embed template is missing.");
-      this.root.replaceChildren(tpl.content.cloneNode(true));
+      const legacy = this.host.querySelector<HTMLTemplateElement>("template[data-unicode-art-template]");
+      this.root.replaceChildren(legacy ? legacy.content.cloneNode(true) : this.scaffold());
       const frame = this.need<HTMLElement>(".frame");
       const grid = this.need<HTMLElement>("[data-unicode-art-root]");
       const dark = this.surfaceDark(payload);
@@ -80,12 +82,36 @@ class View {
     }
   }
 
+  private scaffold(): DocumentFragment {
+    const fragment = document.createDocumentFragment();
+    if (runtimeCss) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = runtimeCss;
+      fragment.append(link);
+    }
+    const frame = document.createElement("div");
+    frame.className = "frame";
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    grid.dataset.unicodeArtRoot = "";
+    frame.append(grid);
+    fragment.append(frame);
+    return fragment;
+  }
+
   private async readPayload(): Promise<PackedEmbed> {
     const data = this.host.querySelector<HTMLScriptElement>("script[data-unicode-art-data]");
     if (!data) throw new Error("Unicode Art embed data is missing.");
-    const codec = data.dataset.codec;
-    if (codec !== "u1" && codec !== "u2" && codec !== "u3" && codec !== "u4") throw new Error("Unicode Art embed codec is not supported.");
-    return unpackEmbedSmall(data.textContent ?? "", codec as EmbedCodec);
+    let source = (data.textContent ?? "").trim();
+    const explicit = data.dataset.codec;
+    let codec: EmbedCodec | null = explicit === "u1" || explicit === "u2" || explicit === "u3" || explicit === "u4" ? explicit : null;
+    if (!codec) {
+      codec = codecFromMarker(source[0] ?? "");
+      if (!codec) throw new Error("Unicode Art embed codec is not supported.");
+      source = source.slice(1);
+    }
+    return unpackEmbedSmall(source, codec);
   }
 
   private fail(err: unknown): void {

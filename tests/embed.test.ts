@@ -11,7 +11,7 @@ import { Tpl } from "../src/embed/tpl.ts";
 import type { Art, ArtCfg, CellColour } from "../src/types.ts";
 
 const root = join(import.meta.dir, "..");
-const template = `<div data-unicode-art data-theme="{{THEME}}" data-surface="{{SURFACE}}" style="{{STYLE}}" aria-label="{{LABEL}}"><script type="application/octet-stream" data-unicode-art-data data-codec="{{CODEC}}">{{DATA}}</script><script src="{{LOAD_SRC}}" data-api="{{API_SRC}}"></script><link href="{{CSS_SRC}}"></div>`;
+const template = `<div data-unicode-art data-theme="{{THEME}}" data-surface="{{SURFACE}}" style="{{STYLE}}" aria-label="{{LABEL}}"><script type="application/octet-stream" data-unicode-art-data>{{DATA}}</script><script src="{{LOAD_SRC}}"></script></div>`;
 const colours: CellColour[] = [
   { fg: { r: 240, g: 90, b: 140 } }, { fg: { r: 240, g: 90, b: 140 } },
   { fg: { r: 90, g: 80, b: 210 }, bg: { r: 20, g: 18, b: 25 } }, { fg: { r: 90, g: 80, b: 210 }, bg: { r: 20, g: 18, b: 25 } },
@@ -175,7 +175,7 @@ test("compact embed payload stays smaller than literal tagged JSON", async () =>
   expect(packed.length).toBeLessThan(literal.length);
 });
 
-test("embed template leaves scaffolding plain and only encodes the art payload", async () => {
+test("new embed shell keeps only host, payload and loader", async () => {
   const packed = await packEmbedSmall(art, cfg);
   const html = new Tpl().make({
     data: packed,
@@ -184,12 +184,17 @@ test("embed template leaves scaffolding plain and only encodes the art payload",
     surface: "auto",
     src: "https://example.test/v1/embed.js",
   }, { html: template });
+  const shipped = await readFile(join(root, "templates", "embed", "embed.html"), "utf8");
   expect(html).toContain("<div data-unicode-art");
-  expect(html).toContain('data-codec="u4"');
   expect(html).toContain('type="application/octet-stream"');
-  expect(html).toContain("https://example.test/v1/embed.css");
+  expect(html).toContain(`>4${packed}</script>`);
   expect(html).toContain("https://example.test/v1/load.js");
-  expect(html).toContain(packed);
+  expect(html).not.toContain("data-codec=");
+  expect(html).not.toContain("data-api=");
+  expect(html).not.toContain("embed.css");
+  expect(html).not.toContain("<template");
+  expect(shipped).not.toContain("<template");
+  expect(shipped).not.toContain("data-codec=");
   expect(html).not.toContain("⣿");
   expect(html).not.toContain("<#");
 });
@@ -211,16 +216,20 @@ test("build publishes the CDN runtime, worker and Brotli assets", async () => {
   expect(build).toContain('naming: "embed-worker.js"');
   expect(build).toContain('join(api, "load.js")');
   expect(build).toContain('join(assets, "brotli_wasm_bg.wasm")');
+  expect(loader).toContain('new URL("embed.js", script.src).href');
   expect(loader).toContain("win.UnicodeArt");
   expect(loader).toContain("api.mount(host)");
   expect(css).toContain(":host");
   expect(css).toContain("font-synthesis: none");
 });
 
-test("embed runtime accepts u1 through u4 in shadow DOM", async () => {
+test("embed runtime accepts legacy and self-identifying u1 through u4 in shadow DOM", async () => {
   const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
-  expect(runtime).toContain('codec !== "u1" && codec !== "u2" && codec !== "u3" && codec !== "u4"');
-  expect(runtime).toContain('unpackEmbedSmall(data.textContent ?? "", codec as EmbedCodec)');
+  expect(runtime).toContain('const codecFromMarker = (marker: string): EmbedCodec | null');
+  expect(runtime).toContain('explicit === "u1" || explicit === "u2" || explicit === "u3" || explicit === "u4"');
+  expect(runtime).toContain('source = source.slice(1);');
+  expect(runtime).toContain('legacy ? legacy.content.cloneNode(true) : this.scaffold()');
+  expect(runtime).toContain('new URL("embed.css", runtimeSrc).href');
   expect(runtime).toContain('String.fromCodePoint(0x2800 +');
   expect(runtime).toContain('attachShadow({ mode: "open" })');
   expect(runtime).toContain('"⣿".repeat(200)');

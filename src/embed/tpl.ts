@@ -10,16 +10,17 @@ const base91 = new Set(base91Alphabet);
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
     return this.fill(tpl.html, {
-      DATA: this.data(cfg.data, cfg.codec),
-      CODEC: cfg.codec,
+      DATA: this.envelope(cfg.data, cfg.codec),
       THEME: cfg.theme,
       SURFACE: cfg.surface,
       STYLE: this.attr(cfg.style ?? STYLE),
       LABEL: this.attr(cfg.label ?? "Embedded Unicode art"),
-      API_SRC: this.attr(cfg.src),
-      CSS_SRC: this.attr(cfg.cssSrc ?? this.peer(cfg.src, "embed.css")),
       LOAD_SRC: this.attr(cfg.loadSrc ?? this.peer(cfg.src, "load.js")),
     });
+  }
+
+  private envelope(value: string, codec: EmbedCodec): string {
+    return `${codec.slice(1)}${this.data(value, codec)}`;
   }
 
   private data(value: string, codec: EmbedCodec): string {

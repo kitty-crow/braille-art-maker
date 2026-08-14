@@ -3,13 +3,13 @@ import { inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
 import { decodeU3, decodeU4, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed } from "./codec.ts";
 import { isUltraRaw, unpackUltra } from "./ultra-raw.ts";
-import { packU4 } from "./ultra-search.ts";
+import { packU4, type PackProgressFn } from "./ultra-search.ts";
 
 const unpackBytes = (bytes: Uint8Array): PackedEmbed => isUltraRaw(bytes) ? unpackUltra(bytes) : unpackRaw(bytes);
 
-export const packEmbedSmall = async (art: Art, cfg: ArtCfg): Promise<string> => {
+export const packEmbedSmall = async (art: Art, cfg: ArtCfg, progress?: PackProgressFn): Promise<string> => {
   const brotli = await brotliPromise;
-  return packU4(art, cfg, bytes => brotli.compress(bytes, { quality: 11 }));
+  return packU4(art, cfg, bytes => brotli.compress(bytes, { quality: 11 }), progress);
 };
 
 export const unpackEmbedSmall = async (source: string, codec: EmbedCodec): Promise<PackedEmbed> => {

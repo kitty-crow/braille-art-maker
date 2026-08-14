@@ -25,14 +25,15 @@ export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
-  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), darkCanvas = qs<HTMLInputElement>("#dark-canvas"), reset = qs<HTMLButtonElement>("#reset-sliders");
+  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
+  const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
-  let embedGeneration = 0, embedTimer = 0, canvasManual = false;
+  let embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
   const makerCfg = (): ArtCfg => ({
@@ -48,30 +49,45 @@ export const startMaker = (): void => {
   };
 
   const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);
-  const syncCanvas = (): void => {
-    const hazard = activeTheme() === "light" && colour.checked && !colourBg.checked;
-    previewScroll.toggleAttribute("data-contrast-dark", darkCanvas.checked);
+  const canvasDark = (theme: Theme = activeTheme()): boolean => theme === "dark" ? !canvasToggle.checked : canvasToggle.checked;
+  const setCanvasControl = (dark: boolean, theme: Theme): void => {
+    const darkTheme = theme === "dark";
+    canvasToggleLabel.textContent = darkTheme ? "Light canvas" : "Dark canvas";
+    canvasToggle.checked = darkTheme ? !dark : dark;
+  };
+  const syncCanvas = (theme: Theme = activeTheme()): void => {
+    const dark = canvasDark(theme);
+    const hazard = theme === "light" && colour.checked && !colourBg.checked;
+    previewScroll.toggleAttribute("data-contrast-dark", dark);
     previewInfo.hidden = !hazard;
     if (hazard) {
-      previewInfo.dataset.tip = darkCanvas.checked
+      previewInfo.dataset.tip = dark
         ? "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is on for readability. You can turn it off, but some colours may then be difficult to see unless Colour background is enabled."
         : "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is off, so some colours may be difficult to see. Enable Dark canvas or Colour background for stronger readability.";
     }
   };
   const applyAutomaticCanvas = (theme: Theme = activeTheme()): void => {
-    if (!canvasManual) darkCanvas.checked = automaticDarkCanvas(theme);
-    syncCanvas();
+    setCanvasControl(manualCanvasDark ?? automaticDarkCanvas(theme), theme);
+    syncCanvas(theme);
   };
-  const syncMakerPolarity = (): void => { invert.checked = darkCanvas.checked; };
+  const syncMakerPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };
   const syncColour = (polarity = false, theme: Theme = activeTheme()): void => {
     colourBg.disabled = !colour.checked;
     fullColour.disabled = !colour.checked || !colourBg.checked;
     applyAutomaticCanvas(theme);
-    if (polarity) syncMakerPolarity();
+    if (polarity) syncMakerPolarity(theme);
   };
   const syncHeroColour = (): void => {
     heroBg.disabled = !heroColour.checked;
     heroFull.disabled = !heroColour.checked || !heroBg.checked;
+  };
+  const setEmbedProgress = (done: number, total: number): void => {
+    const safeTotal = Math.max(1, total);
+    const safeDone = Math.max(0, Math.min(done, safeTotal));
+    embedProgress.hidden = false;
+    embedProgressBar.max = safeTotal;
+    embedProgressBar.value = safeDone;
+    embedProgressText.value = `${Math.round(safeDone / safeTotal * 100)}%`;
   };
 
   const scheduleEmbed = (next: Art, cfg: ArtCfg): void => {
@@ -80,14 +96,20 @@ export const startMaker = (): void => {
     embed = "";
     copyEmbed.disabled = true;
     embedCode.textContent = "Optimising compact embed…";
+    setEmbedProgress(0, 1);
     embedTimer = window.setTimeout(() => {
-      void embedHtml(next, cfg).then(value => {
+      void embedHtml(next, cfg, "auto", "auto", progress => {
+        if (generation !== embedGeneration || art !== next) return;
+        setEmbedProgress(progress.done, progress.total);
+      }).then(value => {
         if (generation !== embedGeneration || art !== next) return;
         embed = value;
+        setEmbedProgress(1, 1);
         embedView.render(value);
         copyEmbed.disabled = false;
       }).catch(error => {
         if (generation !== embedGeneration) return;
+        embedProgressText.value = "Failed";
         embedCode.textContent = error instanceof Error ? `Embed unavailable: ${error.message}` : "Embed unavailable.";
       });
     }, 240);
@@ -150,8 +172,8 @@ export const startMaker = (): void => {
     syncColour(true); schedule();
   });
   for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(true); schedule(); });
-  darkCanvas.addEventListener("change", () => {
-    canvasManual = true;
+  canvasToggle.addEventListener("change", () => {
+    manualCanvasDark = canvasDark();
     syncCanvas();
     syncMakerPolarity();
     schedule();

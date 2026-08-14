@@ -20,15 +20,15 @@ Every candidate is tested raw and with maximum DEFLATE. The strongest candidates
 
 The final bytes use safe ASCII basE91. Brotli is the implicit transport and therefore costs no marker byte; raw or DEFLATE carry a tiny marker only when they are genuinely shorter.
 
-Only the art payload is packed, compressed and encoded. The surrounding `<div>`, Shadow DOM `<template>`, stylesheet link, loader, API script reference, theme and surface settings remain plain readable HTML.
+New fragments keep only the outer host configuration, one self-identifying payload script and one loader script in the copied HTML. The Shadow DOM scaffold and stylesheet link are reconstructed by `embed.js`, and `load.js` derives the API URL from its own URL. Static template markup is therefore not repeated in every embed.
 
-The runtime still decodes `u1`, `u2` and `u3`, so previously copied embeds continue to work.
+The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2` and `u3`, so previously copied embeds continue to work.
 
 Base256/base512 text encodings are not used because non-ASCII code points take multiple bytes in UTF-8 HTML. A safe single-byte ASCII transport is smaller in transferred HTML.
 
 ## Browser
 
-The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. The expensive encoder therefore does not block slider interaction. Decoding remains fast in the normal CDN runtime.
+The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. A progress bar reports the optimisation search while the worker evaluates candidates, so the heavier encoder stays visible without blocking slider interaction. Decoding remains fast in the normal CDN runtime.
 
 The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
@@ -80,4 +80,4 @@ The runtime observes `data-theme` and `data-surface`, so either can be changed a
 window.UnicodeArt.mount(host, { theme: "auto", surface: "auto" })
 ```
 
-The small `load.js` bootstrap loads the API once per page and mounts each host. The runtime decodes the payload, renders in Shadow DOM and uses measured Unicode-cell geometry.
+The small `load.js` bootstrap derives and loads the API once per page and mounts each host. The runtime decodes the payload, creates the Shadow DOM scaffold, loads the shared embed stylesheet and uses measured Unicode-cell geometry.

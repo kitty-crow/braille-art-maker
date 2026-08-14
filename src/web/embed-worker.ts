@@ -2,6 +2,7 @@ import { embedCodec } from "../embed/codec.ts";
 import { packEmbedSmall } from "../embed/small-browser.ts";
 import { Tpl } from "../embed/tpl.ts";
 import type { EmbedSurface, EmbedTheme, EmbedTpl } from "../embed/types.ts";
+import type { PackProgress } from "../embed/ultra-search.ts";
 import type { Art, ArtCfg } from "../types.ts";
 
 interface Request {
@@ -15,6 +16,7 @@ interface Request {
 interface Response {
   readonly id: number;
   readonly html?: string;
+  readonly progress?: PackProgress;
   readonly error?: string;
 }
 
@@ -25,8 +27,11 @@ self.addEventListener("message", event => {
   const request = event.data as Request;
   void (async () => {
     try {
+      const data = await packEmbedSmall(request.art, request.cfg, progress => {
+        self.postMessage({ id: request.id, progress } satisfies Response);
+      });
       const html = fill.make({
-        data: await packEmbedSmall(request.art, request.cfg),
+        data,
         codec: embedCodec,
         theme: request.theme,
         surface: request.surface,

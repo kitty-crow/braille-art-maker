@@ -44,15 +44,18 @@ test("light and dark themes apply visibility-friendly defaults", async () => {
   expect(maker).toContain('syncColour(true, theme);');
 });
 
-test("dark canvas is user-selectable and light foreground-only colour stays warned", async () => {
+test("canvas toggle reverses its action in dark mode and foreground-only colour stays warned", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
-  expect(html).toContain('id="dark-canvas" type="checkbox"> Dark canvas');
+  expect(html).toContain('id="canvas-toggle" type="checkbox"');
+  expect(html).toContain('id="canvas-toggle-label">Dark canvas</span>');
   expect(html).toContain('id="preview-contrast-info"');
   expect(maker).toContain('const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);');
-  expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", darkCanvas.checked);');
-  expect(maker).toContain('canvasManual = true;');
+  expect(maker).toContain('canvasToggleLabel.textContent = darkTheme ? "Light canvas" : "Dark canvas";');
+  expect(maker).toContain('canvasToggle.checked = darkTheme ? !dark : dark;');
+  expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", dark);');
+  expect(maker).toContain('manualCanvasDark = canvasDark();');
   expect(maker).toContain('Dark canvas is off, so some colours may be difficult to see.');
   expect(css).toContain('&[data-contrast-dark]{background:#24212b;');
   expect(css).toContain('.output-grid{color:#f4eff5;}');
@@ -60,8 +63,8 @@ test("dark canvas is user-selectable and light foreground-only colour stays warn
 
 test("maker polarity follows the selected canvas when canvas or mode changes", async () => {
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(maker).toContain('const syncMakerPolarity = (): void => { invert.checked = darkCanvas.checked; };');
-  expect(maker).toContain('darkCanvas.addEventListener("change"');
+  expect(maker).toContain('const syncMakerPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };');
+  expect(maker).toContain('canvasToggle.addEventListener("change"');
   expect(maker).toContain('syncMakerPolarity();');
   expect(maker).toContain('syncColour(true); schedule();');
 });
@@ -80,21 +83,26 @@ test("maker keeps slider defaults and switches only dither when colour is enable
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
-test("maker packs paste-ready embeds in a dedicated worker", async () => {
+test("maker packs paste-ready embeds in a dedicated worker with visible progress", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
   const worker = await readFile(join(root, "src", "web", "embed-worker.ts"), "utf8");
   expect(html).toContain('id="copy-embed"');
   expect(html).toContain('id="embed-code" class="embed-code-view"');
-  expect(maker).toContain('void embedHtml(next, cfg).then(value =>');
+  expect(html).toContain('id="embed-progress-bar"');
+  expect(html).toContain('id="embed-progress-text"');
+  expect(maker).toContain('void embedHtml(next, cfg, "auto", "auto", progress =>');
+  expect(maker).toContain('setEmbedProgress(progress.done, progress.total);');
   expect(maker).toContain('embed = value;');
   expect(maker).toContain('embedView.render(value);');
   expect(maker).toContain('Optimising compact embed…');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
   expect(webEmbed).toContain('new Worker(new URL("embed-worker.js", import.meta.url)');
+  expect(webEmbed).toContain('wait.progress?.(response.progress);');
   expect(webEmbed).toContain('getWorker().postMessage({ id, art, cfg, theme, surface });');
-  expect(worker).toContain('data: await packEmbedSmall');
+  expect(worker).toContain('const data = await packEmbedSmall(request.art, request.cfg, progress =>');
+  expect(worker).toContain('self.postMessage({ id: request.id, progress } satisfies Response);');
   expect(worker).toContain('codec: embedCodec');
   expect(worker).toContain('src: __EMBED_SRC__');
   expect(worker).not.toContain("taggedText");

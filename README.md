@@ -24,13 +24,13 @@ The browser app supports PNG upload, live Unicode preview, dithering, monochrome
 
 The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. **Dark canvas** controls the preview surface independently of the art. It starts from the visibility-friendly automatic choice, but once changed manually the maker keeps the user's canvas choice. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. The canvas control reads **Dark canvas** in light mode and **Light canvas** in dark mode, reversing its checkbox action so the label always describes what enabling it will do. It starts from the visibility-friendly automatic choice, but once changed manually the maker keeps the actual selected canvas. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
 
 **Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
 
 Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
-The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer.
+The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Compact embed optimisation runs in a Worker and reports progress in the maker.
 
 Colour modes:
 
@@ -79,13 +79,11 @@ Every candidate is considered raw and with maximum DEFLATE. The strongest candid
 
 The final bytes use a safe basE91 transport. Brotli is the implicit/default transport with no extra marker; raw or DEFLATE are selected only when their complete encoded payload is genuinely shorter. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
 
-Only the art payload is compressed/encoded. The surrounding `<div>`, `<template>`, stylesheet link, loader, API script reference, theme and surface settings stay normal readable HTML. The decoder remains part of this repository and is bundled into the published runtime.
+New copied embeds contain only the readable outer host attributes, one self-identifying single-line payload script and one loader script. The repeated Shadow DOM template, stylesheet link and API URL are no longer copied into every fragment: `embed.js` reconstructs the internal scaffold and stylesheet, while `load.js` derives the API URL from its own URL. The decoder remains part of this repository and is bundled into the published runtime.
 
-The CDN runtime remains backwards-compatible with `u1`, `u2` and `u3` embeds.
+The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2` and `u3` payloads.
 
 Literal base256/base512 text encodings are not used because their non-ASCII code points take multiple bytes in UTF-8 HTML and make the transferred fragment larger rather than smaller.
-
-The small loader fetches the versioned runtime and stylesheet from GitHub Pages, mounts into Shadow DOM and keeps the consuming site's CSS isolated from the art.
 
 Published assets:
 
