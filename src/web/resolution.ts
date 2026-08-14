@@ -18,6 +18,7 @@ export const bindResolutionGate = (
   const message = opts.message ?? "Resolutions above 256 cells are experimental. Visual rendering may be flaky and performance can be terrible. Keep dragging to continue.";
   let pointer: number | null = null;
   let released = Number(input.value) > notch;
+  let gateX: number | null = null;
   let pointerX = 0;
   let pointerY = 0;
 
@@ -44,13 +45,6 @@ export const bindResolutionGate = (
     return Math.round(min + ratio * (max - min));
   };
 
-  const notchX = (): number => {
-    const rect = input.getBoundingClientRect();
-    const min = Number(input.min);
-    const max = Number(input.max);
-    return rect.left + ((notch - min) / Math.max(1, max - min)) * rect.width;
-  };
-
   const setValue = (value: number): boolean => {
     const next = String(value);
     if (input.value === next) { output.value = next; return false; }
@@ -65,6 +59,7 @@ export const bindResolutionGate = (
     pointerX = event.clientX;
     pointerY = event.clientY;
     released = Number(input.value) > notch;
+    gateX = null;
   });
 
   input.addEventListener("pointermove", event => {
@@ -74,15 +69,27 @@ export const bindResolutionGate = (
     if (released) return;
 
     const desired = valueAt(event.clientX);
-    if (desired <= notch) { hideTip(); return; }
+    if (desired <= notch) {
+      gateX = null;
+      hideTip();
+      return;
+    }
 
-    if (event.clientX < notchX() + resistance) {
+    if (gateX === null) {
+      gateX = event.clientX;
+      setValue(notch);
+      showTip();
+      return;
+    }
+
+    if (event.clientX < gateX + resistance) {
       setValue(notch);
       showTip();
       return;
     }
 
     released = true;
+    gateX = null;
     hideTip();
     setValue(desired);
   });
@@ -104,6 +111,7 @@ export const bindResolutionGate = (
     if (pointer !== event.pointerId) return;
     pointer = null;
     released = Number(input.value) > notch;
+    gateX = null;
     hideTip();
   };
   input.addEventListener("pointerup", finish);
