@@ -155,7 +155,7 @@ export const startMaker = (): void => {
       if (generation !== embedGeneration || art !== next) return;
       const raw = packBoundedRaw(next, cfg);
       // Snapshot before the high-resolution Worker takes ownership of raw.buffer.
-      const cachedRaw = new Blob([raw], { type: "application/x-unicode-art" });
+      const cachedRaw = new Blob([raw.buffer as ArrayBuffer], { type: "application/x-unicode-art" });
       queueCache(() => storeCachedArt(__WEB_VERSION__, id, source, sourceName, cfg, paths, rectangles, next, cachedRaw));
       void embedHtml(next, cfg, "auto", "auto", progress => {
         if (generation !== embedGeneration || art !== next) return;
