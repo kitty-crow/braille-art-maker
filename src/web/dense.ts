@@ -152,11 +152,23 @@ const fillCompactRow = (row: HTMLElement, source: DenseSource, y: number, defaul
 const fillChunkRow = (row: HTMLElement, source: DenseSource, y: number, defaultFg: string): void => {
   const chars = [...padded(source, y)];
   const fragment = document.createDocumentFragment();
+
+  if (source.colours) {
+    const bg = gradient(source.colours, y * source.columns, source.columns, true, "transparent");
+    if (bg) {
+      const backdrop = document.createElement("span");
+      backdrop.className = "unicode-row-bg";
+      backdrop.style.backgroundImage = bg;
+      fragment.appendChild(backdrop);
+    }
+  }
+
   for (let x = 0; x < source.columns; x += chunkCells) {
     const count = Math.min(chunkCells, source.columns - x);
     const chunk = document.createElement("span");
     chunk.className = "unicode-chunk";
-    chunk.style.gridColumn = `span ${count}`;
+    chunk.style.left = `calc(${x} * var(--cell-w))`;
+    chunk.style.width = `calc(${count} * var(--cell-w))`;
     const text = chars.slice(x, x + count).join("");
     if (!source.colours) {
       chunk.textContent = text;
@@ -165,9 +177,7 @@ const fillChunkRow = (row: HTMLElement, source: DenseSource, y: number, defaultF
     }
 
     const offset = y * source.columns + x;
-    const bg = gradient(source.colours, offset, count, true, "transparent");
     const fg = gradient(source.colours, offset, count, false, defaultFg);
-    if (bg) chunk.style.backgroundImage = bg;
     const ink = document.createElement("span");
     ink.className = fg ? "unicode-ink unicode-ink-colour" : "unicode-ink";
     ink.textContent = text;
@@ -236,9 +246,6 @@ const renderInterlaced = async (
   else host.style.removeProperty("font-family");
 
   try {
-    // Interlaced progressive final render: even rows establish image-wide detail, then odd
-    // rows complete it. Very-high-resolution exact fallback is chunked into fixed grid spans
-    // so the whole image remains genuine Unicode without a half-million live cell elements.
     for (const parity of [0, 1] as const) {
       for (let y = parity; y < current.source.rows; y += 2) {
         if (state.get(host) !== current || current.generation !== generation) return;
