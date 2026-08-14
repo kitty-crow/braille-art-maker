@@ -84,15 +84,15 @@ The maker's **Copy embed div** output carries the generated result itself, so th
 
 `u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
 
-Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. The actual shortest final payload wins. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
+Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
 
-The final bytes use a safe basE91 transport. Brotli is the implicit/default transport with no extra marker; raw or DEFLATE are selected only when their complete encoded payload is genuinely shorter. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
+For each binary candidate, `u4` now compares the established safe ASCII basE91 transport with an experimental **CJK-4096** transport. CJK-4096 maps 12 bits to one BMP CJK Unified Ideograph from U+4E00 through U+5DFF and uses a tiny explicit marker for compression mode and tail length. The optimiser deliberately chooses the shortest **character count**, because this experiment targets copied/source payload length. For non-trivial payloads the CJK form is typically about **54% of the basE91 character count** (roughly 46% shorter), although its UTF-8 byte size is larger because each CJK character occupies three bytes.
+
+The CJK encoder/decoder is simple linear bit packing; Brotli remains the expensive part of embed generation. Old basE91 `u4` payloads remain fully decodable, and arbitrary Unicode is still rejected by the embed template validator. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
 
 New copied embeds contain only the readable outer host attributes, one self-identifying single-line payload script and one loader script. The repeated Shadow DOM template, stylesheet link and API URL are no longer copied into every fragment: `embed.js` reconstructs the internal scaffold and stylesheet, while `load.js` derives the API URL from its own URL. The decoder remains part of this repository and is bundled into the published runtime.
 
-The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2` and `u3` payloads.
-
-Literal base256/base512 text encodings are not used because their non-ASCII code points take multiple bytes in UTF-8 HTML and make the transferred fragment larger rather than smaller.
+The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2`, `u3` and previous basE91 `u4` payloads.
 
 Published assets:
 
