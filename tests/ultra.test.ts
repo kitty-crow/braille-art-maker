@@ -70,3 +70,21 @@ test("every foreground-colour ultra representation round-trips exactly", () => {
 test("every full-colour ultra representation round-trips exactly", () => {
   verifyEveryCandidate(makeArt(true), { colour: true, colourBackground: true, fullColour: true });
 });
+
+test("ultra embed dimensions preserve 1024 horizontal cells", () => {
+  const art: Art = {
+    text: "⠀".repeat(1024),
+    columns: 1024,
+    rows: 1,
+    dotsWidth: 2048,
+    dotsHeight: 4,
+    threshold: 0.5,
+    density: 0,
+  };
+  const candidate = packUltraCandidates(art, {})[0];
+  expect(candidate).toBeDefined();
+  const decoded = unpackUltra(candidate!.bytes);
+  expect(decoded.columns).toBe(1024);
+  expect(decoded.rows).toBe(1);
+  expect(decoded.masks).toHaveLength(1024);
+});
