@@ -2,6 +2,8 @@ import type { EmbedSurface, EmbedTheme } from "../embed/types.ts";
 import type { PackProgress } from "../embed/ultra-search.ts";
 import type { Art, ArtCfg } from "../types.ts";
 
+declare const __WEB_VERSION__: string;
+
 interface Response {
   readonly id: number;
   readonly html?: string;
@@ -21,7 +23,9 @@ const pending = new Map<number, Pending>();
 
 const getWorker = (): Worker => {
   if (worker) return worker;
-  worker = new Worker(new URL("embed-worker.js", import.meta.url), { type: "module" });
+  const workerUrl = new URL("embed-worker.js", import.meta.url);
+  workerUrl.searchParams.set("v", __WEB_VERSION__);
+  worker = new Worker(workerUrl, { type: "module" });
   worker.addEventListener("message", event => {
     const response = event.data as Response;
     const wait = pending.get(response.id);
