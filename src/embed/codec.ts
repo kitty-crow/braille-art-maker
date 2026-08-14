@@ -2,6 +2,7 @@ import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
 import { base85Decode, base85Encode } from "./base85.ts";
 import { base91Decode, base91Encode } from "./base91.ts";
+import { cjk4096Decode, cjk4096Encode, type Cjk4096Remainder } from "./cjk4096.ts";
 import { isRawPayload, packRawV1, packRawV2Candidates, unpackRaw, type PackedEmbed, type RawCandidate } from "./raw.ts";
 
 export type EmbedCodec = "u1" | "u2" | "u3" | "u4";
@@ -64,13 +65,28 @@ export const encodeU4 = (mode: U4Mode, bytes: Uint8Array): string => {
   return mode === "b" ? body : `&${mode}${body}`;
 };
 
+export const encodeU4Cjk = (mode: U4Mode, bytes: Uint8Array): string => {
+  const encoded = cjk4096Encode(bytes);
+  return `&${mode.toUpperCase()}${encoded.remainder}${encoded.body}`;
+};
+
 export const decodeU4 = (source: string): { mode: U4Mode; bytes: Uint8Array } => {
   const text = source.trim();
   if (!text) throw new Error("Packed Unicode u4 payload is empty.");
   if (!text.startsWith("&")) return { mode: "b", bytes: base91Decode(text) };
-  const mode = text[1];
-  if (mode !== "r" && mode !== "d") throw new Error("Packed Unicode u4 payload has an invalid compression mode.");
-  return { mode, bytes: base91Decode(text.slice(2)) };
+
+  const marker = text[1];
+  if (marker === "R" || marker === "D" || marker === "B") {
+    const remainderText = text[2];
+    if (remainderText !== "0" && remainderText !== "1" && remainderText !== "2") {
+      throw new Error("Packed Unicode u4 CJK-4096 payload has invalid padding metadata.");
+    }
+    const mode: U4Mode = marker === "R" ? "r" : marker === "D" ? "d" : "b";
+    return { mode, bytes: cjk4096Decode(text.slice(3), Number(remainderText) as Cjk4096Remainder) };
+  }
+
+  if (marker !== "r" && marker !== "d") throw new Error("Packed Unicode u4 payload has an invalid compression mode.");
+  return { mode: marker, bytes: base91Decode(text.slice(2)) };
 };
 
 export { unpackRaw } from "./raw.ts";
