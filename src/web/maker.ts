@@ -3,12 +3,13 @@ import { makeArt } from "../core/art.ts";
 import { denseHtml } from "../html/dense.ts";
 import type { Art, ArtCfg, Dither, Pixels, VecStage } from "../types.ts";
 import { vectorStage } from "../vector/stage.ts";
+import { memoryColumns, loadArt, removeArt, storeArt } from "./art-store.ts";
 import { bindCompare } from "./compare.ts";
 import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
 import { download } from "./download.ts";
 import { EmbedView } from "./embed-view.ts";
-import { embedHtml } from "./embed.ts";
+import { embedHtml, type EmbedSource } from "./embed.ts";
 import { decodeImage } from "./image.ts";
 import { bindTooltips } from "./tooltips.ts";
 
@@ -30,7 +31,7 @@ export const startMaker = (): void => {
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
 
-  let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
+  let vector: VecStage | null = null, name = "hero", art: Art | null = null, artKey: string | null = null, embed = "", loadGeneration = 0, makerGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
   let embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
 
@@ -90,19 +91,24 @@ export const startMaker = (): void => {
     embedProgressText.value = `${Math.round(safeDone / safeTotal * 100)}%`;
   };
 
-  const scheduleEmbed = (next: Art, cfg: ArtCfg): void => {
+  const currentArt = async (): Promise<Art | null> => art ?? (artKey ? loadArt(artKey) : null);
+  const forget = (key: string | null): void => { if (key) void removeArt(key).catch(() => undefined); };
+  const beginEmbed = (): number => {
     const generation = ++embedGeneration;
     window.clearTimeout(embedTimer);
     embed = "";
     copyEmbed.disabled = true;
     embedCode.textContent = "Optimising compact embed…";
     setEmbedProgress(0, 1);
+    return generation;
+  };
+  const scheduleEmbed = (source: EmbedSource, cfg: ArtCfg, generation: number): void => {
     embedTimer = window.setTimeout(() => {
-      void embedHtml(next, cfg, "auto", "auto", progress => {
-        if (generation !== embedGeneration || art !== next) return;
+      void embedHtml(source, cfg, "auto", "auto", progress => {
+        if (generation !== embedGeneration) return;
         setEmbedProgress(progress.done, progress.total);
       }).then(value => {
-        if (generation !== embedGeneration || art !== next) return;
+        if (generation !== embedGeneration) return;
         embed = value;
         setEmbedProgress(1, 1);
         embedView.render(value);
@@ -117,13 +123,32 @@ export const startMaker = (): void => {
 
   const generateMaker = (): void => {
     if (!vector) return;
+    const generation = ++makerGeneration;
+    const embedRun = beginEmbed();
     const cfg = makerCfg();
     const next = makeArt(vector.pixels, cfg);
+    const previousKey = artKey;
     art = next;
+    artKey = null;
+    forget(previousKey);
     renderDense(output, next);
-    scheduleEmbed(next, cfg);
     metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${vector.paths} paths${next.cellColours ? " · colour" : ""}`;
     setStatus("Ready");
+
+    if (next.columns <= memoryColumns) {
+      scheduleEmbed({ art: next }, cfg, embedRun);
+      return;
+    }
+
+    const key = `maker-${Date.now()}-${generation}`;
+    void storeArt(key, next).then(() => {
+      if (generation !== makerGeneration) { forget(key); return; }
+      artKey = key;
+      art = null;
+      scheduleEmbed({ artKey: key }, cfg, embedRun);
+    }).catch(() => {
+      if (generation === makerGeneration) scheduleEmbed({ art: next }, cfg, embedRun);
+    });
   };
 
   const generateHero = (): void => {
@@ -198,11 +223,18 @@ export const startMaker = (): void => {
   drop.addEventListener("dragleave", () => delete drop.dataset.drag);
   drop.addEventListener("drop", event => { event.preventDefault(); delete drop.dataset.drag; const file = event.dataTransfer?.files?.[0]; if (file?.type === "image/png") void loadMaker(file, file.name.replace(/\.[^.]+$/, "")); });
 
-  const textOutput = (): string => art ? (art.cellColours ? taggedText(art) : art.text) : "";
-  copy.addEventListener("click", async () => { if (!art) return; await navigator.clipboard.writeText(textOutput()); const old = copy.textContent; copy.textContent = "Copied"; setTimeout(() => { copy.textContent = old; }, 900); });
+  const textOutput = (value: Art): string => value.cellColours ? taggedText(value) : value.text;
+  copy.addEventListener("click", async () => {
+    const value = await currentArt();
+    if (!value) return;
+    await navigator.clipboard.writeText(textOutput(value));
+    const old = copy.textContent;
+    copy.textContent = "Copied";
+    setTimeout(() => { copy.textContent = old; }, 900);
+  });
   copyEmbed.addEventListener("click", async () => { if (!embed) return; await navigator.clipboard.writeText(embed); const old = copyEmbed.textContent; copyEmbed.textContent = "Copied embed"; setTimeout(() => { copyEmbed.textContent = old; }, 1100); });
-  txt.addEventListener("click", () => { if (art) void download("txt", "text/plain;charset=utf-8", `${textOutput()}\n`); });
-  html.addEventListener("click", () => { if (art) void download("html", "text/html;charset=utf-8", denseHtml(art, name, 0.02)); });
+  txt.addEventListener("click", () => { void (async () => { const value = await currentArt(); if (value) await download("txt", "text/plain;charset=utf-8", `${textOutput(value)}\n`); })(); });
+  html.addEventListener("click", () => { void (async () => { const value = await currentArt(); if (value) await download("html", "text/html;charset=utf-8", denseHtml(value, name, 0.02)); })(); });
   svg.addEventListener("click", () => { if (vector?.svg) void download("svg", "image/svg+xml;charset=utf-8", vector.svg); });
 
   bindCompare(compare, divider);

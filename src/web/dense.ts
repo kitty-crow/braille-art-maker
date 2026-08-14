@@ -1,4 +1,4 @@
-import type { Art, CellColour } from "../types.ts";
+import type { Art, CellColour, Rgb } from "../types.ts";
 import { rgbHex } from "../colour/space.ts";
 
 const innerSize = (element: HTMLElement): { width: number; height: number } => {
@@ -34,31 +34,72 @@ export const fitDense = (host: HTMLElement): void => {
   host.style.height = `${rows * target * 2}px`;
 };
 
-const paint = (cell: HTMLElement, colour?: CellColour): void => {
-  if (colour?.fg) cell.style.color = rgbHex(colour.fg);
-  if (colour?.bg) cell.style.backgroundColor = rgbHex(colour.bg);
+const sameRgb = (a?: Rgb, b?: Rgb): boolean => (!a && !b) || (!!a && !!b && a.r === b.r && a.g === b.g && a.b === b.b);
+const cssRgb = (rgb: Rgb | undefined, fallback: string): string => rgb ? rgbHex(rgb) : fallback;
+const pct = (index: number, columns: number): string => `${Number((index * 100 / columns).toFixed(6))}%`;
+
+const gradient = (
+  colours: readonly CellColour[] | undefined,
+  offset: number,
+  columns: number,
+  background: boolean,
+  fallback: string,
+): string | null => {
+  if (!colours || columns < 1) return null;
+  const rgbAt = (x: number): Rgb | undefined => background ? colours[offset + x]?.bg : colours[offset + x]?.fg;
+  let hasExplicit = false;
+  const stops: string[] = [];
+  let start = 0;
+  while (start < columns) {
+    const rgb = rgbAt(start);
+    if (rgb) hasExplicit = true;
+    let end = start + 1;
+    while (end < columns && sameRgb(rgb, rgbAt(end))) end += 1;
+    const colour = cssRgb(rgb, fallback);
+    stops.push(`${colour} ${pct(start, columns)}`, `${colour} ${pct(end, columns)}`);
+    start = end;
+  }
+  return hasExplicit ? `linear-gradient(to right,${stops.join(",")})` : null;
+};
+
+const stringColumns = (lines: readonly string[]): number => {
+  let columns = 1;
+  for (const line of lines) columns = Math.max(columns, [...line].length);
+  return columns;
 };
 
 export const renderDense = (host: HTMLElement, source: string | Art): void => {
   const text = typeof source === "string" ? source : source.text;
   const colours = typeof source === "string" ? undefined : source.cellColours;
   const lines = text.split("\n");
-  const columns = typeof source === "string" ? Math.max(1, ...lines.map(line => [...line].length)) : source.columns;
+  const columns = typeof source === "string" ? stringColumns(lines) : source.columns;
+  const rows = typeof source === "string" ? Math.max(1, lines.length) : source.rows;
+  const defaultFg = getComputedStyle(host).color || "#201d24";
+  const fragment = document.createDocumentFragment();
+
   host.replaceChildren();
   host.style.setProperty("--cols", String(columns));
-  host.style.setProperty("--rows", String(typeof source === "string" ? Math.max(1, lines.length) : source.rows));
-  let ci = 0;
-  for (const line of lines) {
+  host.style.setProperty("--rows", String(rows));
+
+  for (let y = 0; y < rows; y += 1) {
     const row = document.createElement("div");
     row.className = "unicode-row";
-    for (const char of line.padEnd(columns, "⠀")) {
-      const cell = document.createElement("span");
-      cell.className = "unicode-cell";
-      cell.textContent = char;
-      paint(cell, colours?.[ci++]);
-      row.appendChild(cell);
+    const chars = [...(lines[y] ?? "").padEnd(columns, "⠀")].slice(0, columns).join("");
+    if (!colours) row.textContent = chars;
+    else {
+      const offset = y * columns;
+      const bg = gradient(colours, offset, columns, true, "transparent");
+      const fg = gradient(colours, offset, columns, false, defaultFg);
+      if (bg) row.style.backgroundImage = bg;
+      const ink = document.createElement("span");
+      ink.className = fg ? "unicode-ink unicode-ink-colour" : "unicode-ink";
+      ink.textContent = chars;
+      if (fg) ink.style.backgroundImage = fg;
+      row.appendChild(ink);
     }
-    host.appendChild(row);
+    fragment.appendChild(row);
   }
+
+  host.appendChild(fragment);
   fitDense(host);
 };

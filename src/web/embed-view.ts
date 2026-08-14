@@ -9,6 +9,7 @@ const src = {
   highlight: "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js",
 } as const;
 const loads = new Map<string, Promise<void>>();
+const highlightLimit = 200_000;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -52,7 +53,8 @@ const libs = async (): Promise<Libs> => {
 };
 
 const fence = (value: string): string => {
-  const longest = Math.max(0, ...(value.match(/`+/gu) ?? []).map(run => run.length));
+  let longest = 0;
+  for (const run of value.match(/`+/gu) ?? []) longest = Math.max(longest, run.length);
   return "`".repeat(Math.max(3, longest + 1));
 };
 
@@ -63,6 +65,7 @@ export class EmbedView {
   render(source: string): void {
     const generation = ++this.generation;
     if (!source) { this.host.replaceChildren(); return; }
+    if (source.length > highlightLimit) { this.plain(source); return; }
     void this.marked(source, generation);
   }
 
