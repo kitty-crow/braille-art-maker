@@ -20,9 +20,11 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 1024 horizontal Unicode cells; resolutions above 256 cells are explicitly experimental because browser rendering, memory use and embed generation become much heavier and performance drops significantly.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. Resolutions above 256 cells are explicitly experimental because browser rendering, memory use and embed generation become much heavier.
 
-The Resolution slider has a resistance notch at 256 cells. A normal pointer drag stops there and shows a pointer-following experimental warning; pushing farther through the notch releases the slider into the 257-1024 range. The numerical Resolution value beside the label is directly editable from 24 through 1024 and stays synchronised with the slider. This warning gate is UI-only: the core/CLI ceiling is 1024.
+The Resolution slider runs from 24 through 2048 horizontal Unicode cells. Pointer dragging has deliberate resistance gates at 256, 765 and 1024 cells. The 256 gate marks the experimental range; 765 marks extreme territory; the 1K gate warns **“1K? Are nya crazy?! I’d hate to be your RAM right meow!”**. The slider itself ends at 2048 because that is the highest range confirmed to work reliably in real-device testing.
+
+The numerical Resolution field is intentionally not capped at 2048. A user may type a larger integer such as 8192 or 10240; committing a value above the slider ceiling requires a native Yes/No confirmation that explicitly warns the request is unsupported and may crash the tab. If confirmed, the exact requested value is passed to the engine without a hidden clamp. This is an at-your-own-risk escape hatch, not an endorsed operating range. The CLI/core likewise do not impose an arbitrary upper resolution clamp.
 
 The hero starts in colour at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
@@ -54,7 +56,7 @@ bun run cli -- image.png --colour --embed -o image-embed.html
 Useful options:
 
 ```text
---columns <n>          Unicode columns, 8-1024, default 96; >256 experimental
+--columns <n>          Unicode columns, 8+, default 96; >256 experimental
 --dither <mode>        atkinson|floyd|ordered|threshold, default ordered
 --invert               inverted polarity, default
 --no-invert            disable inverted polarity
@@ -70,6 +72,8 @@ Useful options:
 --svg <path>           also write the Vectoriser SVG
 -o, --output <path>    write output instead of stdout
 ```
+
+The CLI does not impose the browser slider's 2048-cell ceiling. Very large resolutions can require enormous memory and are intentionally left to the caller's judgement.
 
 ## Embedding
 
