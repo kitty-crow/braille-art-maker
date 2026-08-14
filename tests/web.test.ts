@@ -94,6 +94,42 @@ test("maker keeps slider defaults and supports 1024 horizontal cells", async () 
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
+test("high-resolution maker state is backed by IndexedDB instead of cloned into the worker", async () => {
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  const store = await readFile(join(root, "src", "web", "art-store.ts"), "utf8");
+  const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
+  const worker = await readFile(join(root, "src", "web", "embed-worker.ts"), "utf8");
+  expect(store).toContain('export const memoryColumns = 256;');
+  expect(store).toContain('indexedDB.open(dbName, 1)');
+  expect(maker).toContain('if (next.columns <= memoryColumns)');
+  expect(maker).toContain('void storeArt(key, next).then(() =>');
+  expect(maker).toContain('artKey = key;');
+  expect(maker).toContain('art = null;');
+  expect(maker).toContain('scheduleEmbed({ artKey: key }, cfg, embedRun);');
+  expect(webEmbed).toContain('export type EmbedSource = { readonly art: Art } | { readonly artKey: string };');
+  expect(webEmbed).toContain('getWorker().postMessage({ id, ...source, cfg, theme, surface });');
+  expect(worker).toContain('if (request.artKey) return loadArt(request.artKey);');
+});
+
+test("maker and embed runtime render real Unicode by rows rather than one DOM node per cell", async () => {
+  const dense = await readFile(join(root, "src", "web", "dense.ts"), "utf8");
+  const unicodeCss = await readFile(join(root, "web", "styles", "unicode.css"), "utf8");
+  const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
+  const embedCss = await readFile(join(root, "templates", "embed", "embed.css"), "utf8");
+  expect(dense).toContain('row.textContent = chars;');
+  expect(dense).toContain('ink.textContent = chars;');
+  expect(dense).toContain('linear-gradient(to right,');
+  expect(dense).not.toContain('className = "unicode-cell"');
+  expect(unicodeCss).toContain('.unicode-ink-colour');
+  expect(unicodeCss).toContain('background-clip:text');
+  expect(runtime).toContain('const rowText = (payload: PackedEmbed, y: number): string =>');
+  expect(runtime).toContain('row.textContent = text;');
+  expect(runtime).toContain('ink.textContent = text;');
+  expect(runtime).not.toContain('cell.className = "cell"');
+  expect(embedCss).toContain('.ink-colour');
+  expect(embedCss).toContain('background-clip: text');
+});
+
 test("maker packs paste-ready embeds in a dedicated worker with visible progress", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
@@ -103,7 +139,7 @@ test("maker packs paste-ready embeds in a dedicated worker with visible progress
   expect(html).toContain('id="embed-code" class="embed-code-view"');
   expect(html).toContain('id="embed-progress-bar"');
   expect(html).toContain('id="embed-progress-text"');
-  expect(maker).toContain('void embedHtml(next, cfg, "auto", "auto", progress =>');
+  expect(maker).toContain('void embedHtml(source, cfg, "auto", "auto", progress =>');
   expect(maker).toContain('setEmbedProgress(progress.done, progress.total);');
   expect(maker).toContain('embed = value;');
   expect(maker).toContain('embedView.render(value);');
@@ -111,15 +147,24 @@ test("maker packs paste-ready embeds in a dedicated worker with visible progress
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
   expect(webEmbed).toContain('new Worker(new URL("embed-worker.js", import.meta.url)');
   expect(webEmbed).toContain('wait.progress?.(response.progress);');
-  expect(webEmbed).toContain('getWorker().postMessage({ id, art, cfg, theme, surface });');
-  expect(worker).toContain('const data = await packEmbedSmall(request.art, request.cfg, progress =>');
+  expect(webEmbed).toContain('getWorker().postMessage({ id, ...source, cfg, theme, surface });');
+  expect(worker).toContain('const art = await requestArt(request);');
+  expect(worker).toContain('const data = await packEmbedSmall(art, request.cfg, progress =>');
   expect(worker).toContain('self.postMessage({ id: request.id, progress } satisfies Response);');
   expect(worker).toContain('codec: embedCodec');
   expect(worker).toContain('src: __EMBED_SRC__');
   expect(worker).not.toContain("taggedText");
 });
 
-test("embed code is rendered through Marked, DOMPurify and Highlight.js", async () => {
+test("large embed source stays plain text instead of multiplying memory through syntax highlighting", async () => {
+  const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
+  expect(view).toContain('const highlightLimit = 200_000;');
+  expect(view).toContain('if (source.length > highlightLimit) { this.plain(source); return; }');
+  expect(view).toContain('code.textContent = source;');
+  expect(view).not.toContain('Math.max(0, ...');
+});
+
+test("ordinary embed code is rendered through Marked, DOMPurify and Highlight.js", async () => {
   const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
   expect(view).toContain("marked@18.0.7");
