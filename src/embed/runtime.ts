@@ -257,7 +257,7 @@ class View {
       probe.className = "probe";
       probe.textContent = "⣿".repeat(200);
       this.grid.append(probe);
-      advance = probe.getBoundingClientRect().width / 2;
+      advance = probe.getBoundingClientRect().width / 200;
       probe.remove();
     }
     const width = this.frame.clientWidth || this.host.clientWidth;
