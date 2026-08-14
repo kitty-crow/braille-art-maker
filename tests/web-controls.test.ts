@@ -13,10 +13,10 @@ test("reset sliders restores only the four maker slider defaults", async () => {
   expect(match).not.toBeNull();
   const handler = match?.[1] ?? "";
   expect(handler).toContain('columns.value = "96";');
+  expect(handler).toContain('columnsValue.value = columns.value;');
   expect(handler).toContain('contrast.value = "1.12";');
   expect(handler).toContain('detail.value = "0.34";');
   expect(handler).toContain('bias.value = "0.015";');
-  expect(handler).toContain('columnsOut.value = columns.value;');
   expect(handler).toContain('schedule();');
   expect(handler).not.toContain("colour.checked");
   expect(handler).not.toContain("colourBg.checked");
