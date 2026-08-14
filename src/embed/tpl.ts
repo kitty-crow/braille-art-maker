@@ -45,7 +45,7 @@ export class Tpl {
   }
 
   private fill(src: string, vals: Readonly<Record<string, string>>): string {
-    return Object.entries(vals).reduce((out, [key, val]) => out.replaceAll(`{{${key}}}`, val), src);
+    return Object.entries(vals).reduce((out, [key, val]) => out.replaceAll(`{{${key}}}`, () => val), src);
   }
 
   private attr(val: string): string {
