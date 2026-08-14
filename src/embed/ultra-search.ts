@@ -1,6 +1,6 @@
 import { deflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { encodeU4 } from "./codec.ts";
+import { encodeU4, encodeU4Cjk } from "./codec.ts";
 import { packRawV2Candidates } from "./raw.ts";
 import { packUltraCandidates } from "./ultra-raw.ts";
 
@@ -16,6 +16,11 @@ interface Scored {
 const fullSearchColumns = 256;
 const deflate = (bytes: Uint8Array): Uint8Array => deflateSync(bytes, { level: 9, mem: 12 });
 
+const transports = (mode: "r" | "d" | "b", bytes: Uint8Array): readonly string[] => [
+  encodeU4(mode, bytes),
+  encodeU4Cjk(mode, bytes),
+];
+
 const packBounded = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackProgressFn): string => {
   const candidates = packRawV2Candidates(art, cfg);
   const total = Math.max(1, candidates.length * 3);
@@ -23,14 +28,17 @@ const packBounded = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackPro
   let best = "";
   const step = (): void => progress?.({ done: ++done, total });
   const consider = (value: string): void => { if (!best || value.length < best.length) best = value; };
+  const considerTransports = (mode: "r" | "d" | "b", bytes: Uint8Array): void => {
+    for (const value of transports(mode, bytes)) consider(value);
+  };
 
   progress?.({ done: 0, total });
   for (const candidate of candidates) {
-    consider(encodeU4("r", candidate.bytes));
+    considerTransports("r", candidate.bytes);
     step();
-    consider(encodeU4("d", deflate(candidate.bytes)));
+    considerTransports("d", deflate(candidate.bytes));
     step();
-    consider(encodeU4("b", brotli(candidate.bytes)));
+    considerTransports("b", brotli(candidate.bytes));
     step();
   }
   if (!best) throw new Error("No Unicode packing candidates were generated.");
@@ -45,6 +53,9 @@ export const packU4 = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackP
   let best = "";
   const consider = (value: string): void => {
     if (!best || value.length < best.length) best = value;
+  };
+  const considerTransports = (mode: "r" | "d" | "b", bytes: Uint8Array): void => {
+    for (const value of transports(mode, bytes)) consider(value);
   };
 
   const legacy = packRawV2Candidates(art, cfg);
@@ -62,27 +73,27 @@ export const packU4 = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackP
   const step = (): void => progress?.({ done: ++done, total });
 
   for (const candidate of legacy) {
-    consider(encodeU4("r", candidate.bytes));
+    considerTransports("r", candidate.bytes);
     step();
     const compressed = deflate(candidate.bytes);
-    consider(encodeU4("d", compressed));
+    considerTransports("d", compressed);
     step();
-    consider(encodeU4("b", brotli(candidate.bytes)));
+    considerTransports("b", brotli(candidate.bytes));
     step();
   }
 
   const ultra: Scored[] = ultraRaw.map(candidate => {
-    consider(encodeU4("r", candidate.bytes));
+    considerTransports("r", candidate.bytes);
     step();
     const compressed = deflate(candidate.bytes);
-    consider(encodeU4("d", compressed));
+    considerTransports("d", compressed);
     step();
     return { bytes: candidate.bytes, score: compressed.length };
   });
 
   ultra.sort((a, b) => a.score - b.score || a.bytes.length - b.bytes.length);
   for (let i = 0; i < limit; i += 1) {
-    consider(encodeU4("b", brotli(ultra[i]!.bytes)));
+    considerTransports("b", brotli(ultra[i]!.bytes));
     step();
   }
   if (!best) throw new Error("No Unicode packing candidates were generated.");
