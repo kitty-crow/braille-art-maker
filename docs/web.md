@@ -12,7 +12,9 @@ When the page is light and the maker is showing foreground-only colour, the prev
 
 Paste-ready embeds use the same safety rule: with `data-surface="auto"`, foreground-only colour on a resolved light theme receives the dark surface. Background/full-colour output follows the normal theme surface. The consuming site may explicitly set `data-surface="light"` if it accepts the readability trade-off.
 
-The embed fragment contains compact `u2` data rather than literal Unicode/tagged TXT. Only the art payload is packed, losslessly DEFLATE-compressed and base64url encoded; the surrounding embed HTML stays readable. The maker displays the fragment as a sanitised, syntax-highlighted HTML block using Marked, DOMPurify and Highlight.js.
+The embed fragment uses the lossless `u3` codec. The app tries several exact mask/colour representations, Brotli-compresses every candidate at quality 11 and uses the smallest result with safe ASCII base85 transport. This heavier work is delayed until after the live preview updates. Only the art payload is encoded; the surrounding embed HTML stays readable. The fragment itself is displayed through Marked, DOMPurify and Highlight.js.
+
+Browser TXT, HTML and SVG downloads are content-addressed as `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, using the SHA-256 of the exact downloadable bytes.
 
 The top navigation is a sticky floating bar and remains pinned near the top of the viewport while the page scrolls.
 

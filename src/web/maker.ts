@@ -32,6 +32,7 @@ export const startMaker = (): void => {
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
+  let embedGeneration = 0, embedTimer = 0;
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
   const makerCfg = (): ArtCfg => ({
@@ -64,15 +65,32 @@ export const startMaker = (): void => {
     heroFull.disabled = !heroColour.checked || !heroBg.checked;
   };
 
+  const scheduleEmbed = (next: Art, cfg: ArtCfg): void => {
+    const generation = ++embedGeneration;
+    window.clearTimeout(embedTimer);
+    embed = "";
+    copyEmbed.disabled = true;
+    embedCode.textContent = "Packing compact embed…";
+    embedTimer = window.setTimeout(() => {
+      void embedHtml(next, cfg).then(value => {
+        if (generation !== embedGeneration || art !== next) return;
+        embed = value;
+        embedView.render(value);
+        copyEmbed.disabled = false;
+      }).catch(error => {
+        if (generation !== embedGeneration) return;
+        embedCode.textContent = error instanceof Error ? `Embed unavailable: ${error.message}` : "Embed unavailable.";
+      });
+    }, 240);
+  };
+
   const generateMaker = (): void => {
     if (!vector) return;
     const cfg = makerCfg();
     const next = makeArt(vector.pixels, cfg);
     art = next;
-    embed = embedHtml(next, cfg);
-    embedView.render(embed);
-    copyEmbed.disabled = false;
     renderDense(output, next);
+    scheduleEmbed(next, cfg);
     metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${vector.paths} paths${next.cellColours ? " · colour" : ""}`;
     setStatus("Ready");
   };

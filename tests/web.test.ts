@@ -78,16 +78,18 @@ test("maker keeps slider defaults and switches only dither when colour is enable
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
-test("maker exposes a packed paste-ready embed div", async () => {
+test("maker exposes a compact asynchronously packed paste-ready embed div", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
   expect(html).toContain('id="copy-embed"');
   expect(html).toContain('id="embed-code" class="embed-code-view"');
-  expect(maker).toContain('embed = embedHtml(next, cfg)');
-  expect(maker).toContain('embedView.render(embed)');
+  expect(maker).toContain('void embedHtml(next, cfg).then(value =>');
+  expect(maker).toContain('embed = value;');
+  expect(maker).toContain('embedView.render(value);');
+  expect(maker).toContain('Packing compact embed…');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
-  expect(webEmbed).toContain('data: packEmbed(art, cfg, embedCodec)');
+  expect(webEmbed).toContain('data: await packEmbedSmall(art, cfg)');
   expect(webEmbed).toContain('codec: embedCodec');
   expect(webEmbed).toContain('src: __EMBED_SRC__');
   expect(webEmbed).not.toContain("taggedText");

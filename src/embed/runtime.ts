@@ -1,5 +1,5 @@
-import { unpackEmbed } from "./codec.ts";
 import type { EmbedCodec, PackedEmbed } from "./codec.ts";
+import { unpackEmbedSmall } from "./small-browser.ts";
 import type { EmbedSurface, EmbedTheme } from "./types.ts";
 
 interface Opts { readonly theme?: EmbedTheme; readonly surface?: EmbedSurface; }
@@ -17,11 +17,12 @@ const css = (rgb: { readonly r: number; readonly g: number; readonly b: number }
 class View {
   private readonly root: ShadowRoot;
   private readonly media = matchMedia("(prefers-color-scheme: dark)");
-  private readonly attrs = new MutationObserver(() => this.render());
+  private readonly attrs = new MutationObserver(() => { void this.render(); });
   private readonly size = new ResizeObserver(() => this.fit());
   private frame: HTMLElement | null = null;
   private grid: HTMLElement | null = null;
   private payload: PackedEmbed | null = null;
+  private generation = 0;
 
   constructor(private readonly host: HTMLElement, private readonly opts: Opts) {
     this.root = host.shadowRoot ?? host.attachShadow({ mode: "open" });
@@ -31,16 +32,18 @@ class View {
     this.attrs.observe(this.host, { attributes: true });
     this.size.observe(this.host);
     this.media.addEventListener("change", this.onTheme);
-    this.render();
+    void this.render();
   }
 
   private readonly onTheme = (): void => {
-    if (this.theme() === "auto" || this.surface() === "auto") this.render();
+    if (this.theme() === "auto" || this.surface() === "auto") void this.render();
   };
 
-  private render(): void {
+  private async render(): Promise<void> {
+    const generation = ++this.generation;
     try {
-      const payload = this.readPayload();
+      const payload = await this.readPayload();
+      if (generation !== this.generation) return;
       const tpl = this.host.querySelector<HTMLTemplateElement>("template[data-unicode-art-template]");
       if (!tpl) throw new Error("Unicode Art embed template is missing.");
       this.root.replaceChildren(tpl.content.cloneNode(true));
@@ -73,16 +76,16 @@ class View {
       requestAnimationFrame(() => this.fit());
       void document.fonts?.ready.then(() => this.fit());
     } catch (err: unknown) {
-      this.fail(err);
+      if (generation === this.generation) this.fail(err);
     }
   }
 
-  private readPayload(): PackedEmbed {
+  private async readPayload(): Promise<PackedEmbed> {
     const data = this.host.querySelector<HTMLScriptElement>("script[data-unicode-art-data]");
     if (!data) throw new Error("Unicode Art embed data is missing.");
     const codec = data.dataset.codec;
-    if (codec !== "u1" && codec !== "u2") throw new Error("Unicode Art embed codec is not supported.");
-    return unpackEmbed(data.textContent ?? "", codec as EmbedCodec);
+    if (codec !== "u1" && codec !== "u2" && codec !== "u3") throw new Error("Unicode Art embed codec is not supported.");
+    return unpackEmbedSmall(data.textContent ?? "", codec as EmbedCodec);
   }
 
   private fail(err: unknown): void {
