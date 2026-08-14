@@ -9,3 +9,4 @@ This directory documents the Braille Art Maker design and public contract while 
 - [CLI and library](cli.md): command surface, reusable core and testing expectations.
 - [Dependencies](dependencies.md): what belongs to Vectoriser, Braille QR, the Pages template and Braille Art Maker itself.
 - [Reverse engineering notes](reverse-engineering.md): what was learned from Vertopal/UBRL and what is independently implemented here.
+- [Implementation documentation rules](CONTRIBUTING-NOTES.md): what must stay in sync when code lands.
