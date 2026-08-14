@@ -26,28 +26,32 @@ The Resolution slider runs from 24 through 2048 horizontal Unicode cells. Pointe
 
 The numerical Resolution field is intentionally not capped at 2048. A user may type a larger integer such as 8192 or 10240; committing a value above the slider ceiling requires a native Yes/No confirmation that explicitly warns the request is unsupported and may crash the tab. If confirmed, the exact requested value is passed to the engine without a hidden clamp. This is an at-your-own-risk escape hatch, not an endorsed operating range. The CLI/core likewise do not impose an arbitrary upper resolution clamp.
 
-The hero starts in colour at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
+The hero starts in **Colour** at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. **Full Colour** starts off. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. The canvas control is the first checkbox. It reads **Dark canvas** in light mode and forces a dark preview surface when enabled; in dark mode it reads **Light canvas** and forces a light preview surface when enabled. Once changed manually, the maker keeps the actual selected surface across later theme/colour changes. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. Its colour UI deliberately has only two controls: **Colour** is foreground-only colour on the normal Unicode mask, while **Full Colour** enables the adaptive two-colour foreground/background representation. There is no separate background-only mode in the browser UI. Enabling Colour keeps the slider values, switches the dither control to Atkinson and starts with Full Colour off.
 
-**Reset sliders** restores only Resolution, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
+The canvas control is the first checkbox. It reads **Dark canvas** in light mode and forces a dark preview surface when enabled; in dark mode it reads **Light canvas** and forces a light preview surface when enabled. Once changed manually, the maker keeps the actual selected surface across later theme/colour changes. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
+
+**Reset sliders** restores only Resolution, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves Colour/Full Colour, dither, canvas and polarity untouched.
+
+The latest completed maker result is persisted locally in IndexedDB so a refresh does not need to regenerate the Unicode art or re-encode its embed. The art is stored as the same compact lossless binary representation used by the high-resolution worker path, and the finished embed is stored as a Blob. The source/configuration are retained so editing can resume after restoration. This cache is version-scoped and does **not** store the live high-resolution `Art` object graph or use IndexedDB as the worker transport path.
 
 Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
 The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Embed generation runs in a Worker. While it is running the maker shows **Generating embed** and an **Encoding art…** progress bar; the progress UI is hidden automatically when encoding reaches 100%.
 
-Colour modes:
+Colour modes exposed by the browser maker:
 
-- foreground colour follows the normal Unicode mask
-- background colour can preserve pixels on the off side of the mask
-- full colour can split each 2x4 source cell into two perceptual colour groups
+- **Colour** — foreground colour follows the normal Unicode mask
+- **Full Colour** — each 2x4 source cell can use adaptive foreground and background colour groups
+
+The lower-level `colourBackground` configuration and legacy `--colour-background` CLI flag remain accepted for backwards compatibility, but the redundant background-only mode is no longer presented by the browser maker.
 
 ## CLI
 
 ```bash
 bun run cli -- image.png
 bun run cli -- image.png --colour -o image.txt
-bun run cli -- image.png --colour-background -o image.txt
 bun run cli -- image.png --full-colour --html -o image.html
 bun run cli -- image.png --full-colour --ansi
 bun run cli -- image.png --colour --embed -o image-embed.html
@@ -61,7 +65,6 @@ Useful options:
 --invert               inverted polarity, default
 --no-invert            disable inverted polarity
 --colour               foreground colour tags
---colour-background    foreground + background colour tags
 --full-colour          adaptive two-colour cells
 --ansi                 emit terminal truecolour escapes
 --html                 self-contained HTML
@@ -73,7 +76,7 @@ Useful options:
 -o, --output <path>    write output instead of stdout
 ```
 
-The CLI does not impose the browser slider's 2048-cell ceiling. Very large resolutions can require enormous memory and are intentionally left to the caller's judgement.
+The CLI does not impose the browser slider's 2048-cell ceiling. Very large resolutions can require enormous memory and are intentionally left to the caller's judgement. The older `--colour-background` flag remains accepted for compatibility but is no longer a recommended/documented colour mode.
 
 ## Embedding
 
@@ -99,7 +102,7 @@ https://kitty-crow.github.io/braille-art-maker/v1/embed.css
 https://kitty-crow.github.io/braille-art-maker/v1/load.js
 ```
 
-With the default `data-surface="auto"`, a light-themed foreground-only colour embed deliberately uses the dark surface for readability. Background-coloured/full-colour embeds follow the light surface normally. A site author can force `data-surface="light"`, but should be aware that some foreground colours may then become difficult to see.
+With the default `data-surface="auto"`, a light-themed foreground-only Colour embed deliberately uses the dark surface for readability. Full Colour embeds follow the light surface normally. A site author can force `data-surface="light"`, but should be aware that some foreground colours may then become difficult to see.
 
 See [Embedding](docs/embed.md).
 
@@ -131,7 +134,7 @@ src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
 src/embed/       packed/compressed embed codec, generator and browser runtime
-src/web/         browser behaviour and embed worker
+src/web/         browser behaviour, IndexedDB cache and embed worker
 src/cli/         CLI parsing and output
 templates/embed/ paste-ready embed host, CSS and loader
 extras/term/     generic C colour header and terminal viewer
