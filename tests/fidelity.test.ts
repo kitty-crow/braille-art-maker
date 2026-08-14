@@ -141,6 +141,7 @@ test("resolution gates include 765 and 1K jokes while manual values remain unbou
   const maker = await read("src/web/maker.ts");
   const gate = await read("src/web/resolution.ts");
   const size = await read("src/core/size.ts");
+  const art = await read("src/core/art.ts");
   expect(html).toContain('id="columns" type="range" min="24" max="2048"');
   expect(html).toContain('id="columns-value" class="resolution-value" type="number" min="24" step="1"');
   expect(html).not.toContain('id="columns-value" class="resolution-value" type="number" min="24" max=');
@@ -155,8 +156,10 @@ test("resolution gates include 765 and 1K jokes while manual values remain unbou
   expect(maker).toContain("columns: Number(columnsValue.value)");
   expect(maker).toContain("2K was the last stop. Are nya sure you want to keep going?");
   expect(maker).toContain("This is unsupported and may crash the tab.");
-  expect(size).not.toContain("maxColumns");
+  expect(size).toContain("export const maxColumns = 2048;");
   expect(size).not.toContain("Math.min(maxColumns");
+  expect(art).not.toContain("Math.min(maxColumns");
+  expect(art).not.toContain("artSize, maxColumns, minColumns");
 });
 
 test("all source pages preserve the mobile viewport contract", async () => {
