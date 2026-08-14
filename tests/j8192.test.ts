@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { decodeU4, encodeU4, encodeU4J, type U4Mode } from "../src/embed/codec.ts";
-import { j8192Alphabet, j8192Decode, j8192Encode } from "../src/embed/j8192.ts";
+import { j8192Alphabet, j8192Decode, j8192Encode, type J8192Remainder } from "../src/embed/j8192.ts";
 import { packEmbedSmall, unpackEmbedSmall } from "../src/embed/small-bun.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 import type { Art } from "../src/types.ts";
@@ -36,7 +36,7 @@ test("J8192 round-trips every 13-bit tail state exactly", () => {
   for (let length = 0; length <= 512; length += 1) {
     const source = bytes(length);
     const encoded = j8192Encode(source);
-    expect(encoded.remainder).toBe((length * 8) % 13);
+    expect(encoded.remainder).toBe(((length * 8) % 13) as J8192Remainder);
     expect(encoded.body.length).toBe(Math.ceil(length * 8 / 13));
     expect(j8192Decode(encoded.body, encoded.remainder)).toEqual(source);
   }
