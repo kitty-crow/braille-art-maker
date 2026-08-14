@@ -25,9 +25,9 @@ export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
-  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders"), resolutionTip = qs<HTMLElement>("#resolution-tip");
+  const columns = qs<HTMLInputElement>("#columns"), columnsValue = qs<HTMLInputElement>("#columns-value"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders"), resolutionTip = qs<HTMLElement>("#resolution-tip");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
-  const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
+  const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), embedCode = qs<HTMLElement>("#embed-code");
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
 
@@ -85,10 +85,10 @@ export const startMaker = (): void => {
   const setEmbedProgress = (done: number, total: number): void => {
     const safeTotal = Math.max(1, total);
     const safeDone = Math.max(0, Math.min(done, safeTotal));
-    embedProgress.hidden = false;
     embedProgressBar.max = safeTotal;
     embedProgressBar.value = safeDone;
     embedProgressText.value = `${Math.round(safeDone / safeTotal * 100)}%`;
+    embedProgress.hidden = safeDone >= safeTotal;
   };
 
   const scheduleEmbed = (next: Art, cfg: ArtCfg): void => {
@@ -96,7 +96,7 @@ export const startMaker = (): void => {
     window.clearTimeout(embedTimer);
     embed = "";
     copyEmbed.disabled = true;
-    embedCode.textContent = "Optimising compact embed…";
+    embedCode.textContent = "Generating embed";
     setEmbedProgress(0, 1);
     embedTimer = window.setTimeout(() => {
       void embedHtml(next, cfg, "auto", "auto", progress => {
@@ -110,6 +110,7 @@ export const startMaker = (): void => {
         copyEmbed.disabled = false;
       }).catch(error => {
         if (generation !== embedGeneration) return;
+        embedProgress.hidden = false;
         embedProgressText.value = "Failed";
         embedCode.textContent = error instanceof Error ? `Embed unavailable: ${error.message}` : "Embed unavailable.";
       });
@@ -167,7 +168,7 @@ export const startMaker = (): void => {
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
-  bindResolutionGate(columns, columnsOut, resolutionTip, schedule);
+  bindResolutionGate(columns, columnsValue, resolutionTip, schedule);
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
@@ -183,10 +184,10 @@ export const startMaker = (): void => {
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   reset.addEventListener("click", () => {
     columns.value = "96";
+    columnsValue.value = columns.value;
     contrast.value = "1.12";
     detail.value = "0.34";
     bias.value = "0.015";
-    columnsOut.value = columns.value;
     schedule();
   });
   addEventListener("unicode-art-theme", event => {

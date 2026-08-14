@@ -80,21 +80,25 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker gates the experimental 257-1024 range behind a 256 resistance notch", async () => {
+test("maker gates the experimental 257-1024 range and allows direct numerical resolution entry", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const gate = await readFile(join(root, "src", "web", "resolution.ts"), "utf8");
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
+  expect(html).toContain('Resolution <input id="columns-value" class="resolution-value" type="number" min="24" max="1024" step="1" value="96"');
   expect(html).toContain('id="columns" type="range" min="24" max="1024" step="1" value="96"');
   expect(html).toContain('class="resolution-notch"');
   expect(html).toContain('id="resolution-tip" class="slider-tip resolution-tip"');
-  expect(html).toContain('Resolutions above 256 cells are experimental.');
-  expect(maker).toContain('bindResolutionGate(columns, columnsOut, resolutionTip, schedule);');
+  expect(html).toContain('Resolutions above 256 cells are experimental and performance drops significantly.');
+  expect(maker).toContain('bindResolutionGate(columns, columnsValue, resolutionTip, schedule);');
+  expect(maker).toContain('columnsValue.value = columns.value;');
   expect(gate).toContain('const notch = opts.notch ?? 256;');
   expect(gate).toContain('const resistance = opts.resistancePx ?? 34;');
-  expect(gate).toContain('requested > notch');
+  expect(gate).toContain('valueInput.addEventListener("input"');
+  expect(gate).toContain('valueInput.addEventListener("change", commitManual);');
   expect(gate).toContain('event.clientX < notchX() + resistance');
-  expect(gate).toContain('Keep dragging to continue.');
+  expect(gate).toContain('performance drops significantly');
+  expect(css).toContain('.resolution-value');
   expect(css).toContain('.resolution-notch');
   expect(css).toContain('left:23.2%');
 });
@@ -112,20 +116,23 @@ test("maker keeps the non-resolution slider and colour defaults", async () => {
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
-test("maker packs paste-ready embeds in a dedicated worker with visible progress", async () => {
+test("maker packs paste-ready embeds in a dedicated worker with transient progress", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
   const worker = await readFile(join(root, "src", "web", "embed-worker.ts"), "utf8");
   expect(html).toContain('id="copy-embed"');
   expect(html).toContain('id="embed-code" class="embed-code-view"');
+  expect(html).toContain('<span>Encoding art…</span>');
   expect(html).toContain('id="embed-progress-bar"');
   expect(html).toContain('id="embed-progress-text"');
   expect(maker).toContain('void embedHtml(next, cfg, "auto", "auto", progress =>');
   expect(maker).toContain('setEmbedProgress(progress.done, progress.total);');
   expect(maker).toContain('embed = value;');
   expect(maker).toContain('embedView.render(value);');
-  expect(maker).toContain('Optimising compact embed…');
+  expect(maker).toContain('embedCode.textContent = "Generating embed";');
+  expect(maker).toContain('embedProgress.hidden = safeDone >= safeTotal;');
+  expect(maker).not.toContain('Optimising compact embed…');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
   expect(webEmbed).toContain('new Worker(new URL("embed-worker.js", import.meta.url)');
   expect(webEmbed).toContain('wait.progress?.(response.progress);');
@@ -150,12 +157,13 @@ test("embed code is rendered through Marked, DOMPurify and Highlight.js", async 
   expect(css).toContain("var(--code-attr)");
 });
 
-test("top navigation stays pinned as the page scrolls", async () => {
+test("top navigation stays pinned as the page scrolls without the temporary test badge", async () => {
   const css = await readFile(join(root, "web", "styles", "header.css"), "utf8");
   expect(css).toContain("position:sticky");
   expect(css).toContain("top:8px");
   expect(css).toContain("z-index:100");
   expect(css).toContain("backdrop-filter:blur(18px)");
+  expect(css).not.toContain("TEST BUILD");
 });
 
 test("range controls have pointer-following accessible info tooltips", async () => {
