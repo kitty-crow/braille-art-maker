@@ -10,19 +10,9 @@ The canvas control is the first checkbox. In light mode it is **Dark canvas** an
 
 When foreground-only colour is shown on an actual light canvas, the question-mark tooltip warns that some colours can be difficult to see. This applies whether the page theme itself is light or the user has explicitly enabled Light canvas in dark mode.
 
-## High-resolution preview memory
-
-The preview is always real Unicode text. It is never replaced with a canvas bitmap, image or other raster surrogate.
-
-The browser renderer uses one Unicode text row per output row instead of one `<span>` per cell. Monochrome rows are plain text nodes. Coloured rows still contain the exact Unicode characters, while foreground/background colours are represented as hard-stop CSS gradients aligned to the cell boundaries. This keeps selection/copy semantics and exact generated characters while avoiding hundreds of thousands of DOM nodes at 1024 columns.
-
-After a result above 256 columns is rendered, its heavy `Art` object is written to IndexedDB and released from the main-page state. The visible Unicode remains in the DOM. Copy, TXT and HTML actions load the backing art on demand. The embed worker also loads the high-resolution art directly from IndexedDB, avoiding a structured-clone copy of the full colour-object graph from the page into the Worker.
-
 Paste-ready embeds use the same safety rule: with `data-surface="auto"`, foreground-only colour on a resolved light theme receives the dark surface. Background/full-colour output follows the normal theme surface. The consuming site may explicitly set `data-surface="light"` if it accepts the readability trade-off.
 
-For outputs through 256 columns, the embed fragment uses the full lossless `u4` optimiser search. Above 256 columns, `u4` uses a bounded-memory exact path: one packed representation is compared as raw, maximum-DEFLATE and Brotli-11. The shortest transport wins. This avoids giant candidate arrays and JavaScript argument-list failures while remaining lossless.
-
-The heavier encoder runs in a dedicated Web Worker and reports progress. New copied embeds contain only readable host attributes, one self-identifying payload script and one loader script; the CDN runtime reconstructs the Shadow DOM scaffold and shared stylesheet. Large generated embed source is displayed as one plain code text node instead of being duplicated through Marked/DOMPurify/Highlight.js; normal-sized fragments keep syntax highlighting.
+The embed fragment uses the lossless `u4` optimiser. It searches multiple exact mask/colour representations and compares raw, maximum-DEFLATE and Brotli-11 results, then uses the shortest complete payload with safe ASCII basE91 transport. The heavier encoder runs in a dedicated Web Worker and reports its search through a progress bar. New copied embeds contain only readable host attributes, one self-identifying payload script and one loader script; the CDN runtime reconstructs the Shadow DOM scaffold and shared stylesheet. The fragment itself is displayed through Marked, DOMPurify and Highlight.js.
 
 Browser TXT, HTML and SVG downloads are content-addressed as `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, using the SHA-256 of the exact downloadable bytes.
 

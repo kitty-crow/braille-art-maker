@@ -1,7 +1,7 @@
 import { deflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
 import { encodeU4 } from "./codec.ts";
-import { packRawV1, packRawV2Candidates } from "./raw.ts";
+import { packRawV2Candidates } from "./raw.ts";
 import { packUltraCandidates } from "./ultra-raw.ts";
 
 export type BrotliFn = (bytes: Uint8Array) => Uint8Array;
@@ -10,36 +10,14 @@ export type PackProgressFn = (progress: PackProgress) => void;
 
 interface Scored {
   readonly bytes: Uint8Array;
+  readonly deflated: Uint8Array;
   readonly score: number;
 }
 
 const deflate = (bytes: Uint8Array): Uint8Array => deflateSync(bytes, { level: 9, mem: 12 });
 
-const packLarge = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackProgressFn): string => {
-  const total = 3;
-  let done = 0;
-  let best = "";
-  const step = (): void => progress?.({ done: ++done, total });
-  const consider = (value: string): void => { if (!best || value.length < best.length) best = value; };
-  const raw = packRawV1(art, cfg);
-  consider(encodeU4("r", raw));
-  step();
-  consider(encodeU4("d", deflate(raw)));
-  step();
-  consider(encodeU4("b", brotli(raw)));
-  step();
-  return best;
-};
-
 export const packU4 = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackProgressFn): string => {
   progress?.({ done: 0, total: 1 });
-
-  // Above the original 256-column envelope, favour one strong lossless raw representation
-  // over materialising dozens of full-size exact candidates at once. Brotli/DEFLATE still
-  // compete for the shortest transport, but peak memory stays bounded and no giant spread
-  // operations from the ultra candidate family are reached.
-  if (art.columns > 256) return packLarge(art, cfg, brotli, progress);
-
   let best = "";
   const consider = (value: string): void => {
     if (!best || value.length < best.length) best = value;
@@ -75,7 +53,7 @@ export const packU4 = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackP
     const compressed = deflate(candidate.bytes);
     consider(encodeU4("d", compressed));
     step();
-    return { bytes: candidate.bytes, score: compressed.length };
+    return { bytes: candidate.bytes, deflated: compressed, score: compressed.length };
   });
 
   ultra.sort((a, b) => a.score - b.score || a.bytes.length - b.bytes.length);

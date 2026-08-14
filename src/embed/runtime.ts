@@ -1,7 +1,6 @@
 import type { EmbedCodec, PackedEmbed } from "./codec.ts";
 import { unpackEmbedSmall } from "./small-browser.ts";
 import type { EmbedSurface, EmbedTheme } from "./types.ts";
-import type { CellColour, Rgb } from "../types.ts";
 
 interface Opts { readonly theme?: EmbedTheme; readonly surface?: EmbedSurface; }
 interface Api { readonly mount: (host: Element | null, opts?: Opts) => void; }
@@ -15,52 +14,17 @@ declare global {
 
 const runtimeSrc = document.currentScript instanceof HTMLScriptElement ? document.currentScript.src : "";
 const runtimeCss = runtimeSrc ? new URL("embed.css", runtimeSrc).href : "";
-const css = (rgb: Rgb): string => `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
+const css = (rgb: { readonly r: number; readonly g: number; readonly b: number }): string => `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
 const codecFromMarker = (marker: string): EmbedCodec | null => marker === "1" || marker === "2" || marker === "3" || marker === "4" ? `u${marker}` as EmbedCodec : null;
-const sameRgb = (a?: Rgb, b?: Rgb): boolean => (!a && !b) || (!!a && !!b && a.r === b.r && a.g === b.g && a.b === b.b);
-const pct = (index: number, columns: number): string => `${Number((index * 100 / columns).toFixed(6))}%`;
-
-const gradient = (
-  colours: readonly CellColour[] | undefined,
-  offset: number,
-  columns: number,
-  background: boolean,
-  fallback: string,
-): string | null => {
-  if (!colours || columns < 1) return null;
-  const rgbAt = (x: number): Rgb | undefined => background ? colours[offset + x]?.bg : colours[offset + x]?.fg;
-  let explicit = false;
-  const stops: string[] = [];
-  let start = 0;
-  while (start < columns) {
-    const rgb = rgbAt(start);
-    if (rgb) explicit = true;
-    let end = start + 1;
-    while (end < columns && sameRgb(rgb, rgbAt(end))) end += 1;
-    const colour = rgb ? css(rgb) : fallback;
-    stops.push(`${colour} ${pct(start, columns)}`, `${colour} ${pct(end, columns)}`);
-    start = end;
-  }
-  return explicit ? `linear-gradient(to right,${stops.join(",")})` : null;
-};
-
-const rowText = (payload: PackedEmbed, y: number): string => {
-  let text = "";
-  const offset = y * payload.columns;
-  for (let x = 0; x < payload.columns; x += 1) text += String.fromCodePoint(0x2800 + (payload.masks[offset + x] ?? 0));
-  return text;
-};
 
 class View {
   private readonly root: ShadowRoot;
   private readonly media = matchMedia("(prefers-color-scheme: dark)");
-  private readonly attrs = new MutationObserver(() => this.syncSurface());
+  private readonly attrs = new MutationObserver(() => { void this.render(); });
   private readonly size = new ResizeObserver(() => this.fit());
   private frame: HTMLElement | null = null;
   private grid: HTMLElement | null = null;
-  private columns = 0;
-  private rows = 0;
-  private foregroundOnly = false;
+  private payload: PackedEmbed | null = null;
   private generation = 0;
 
   constructor(private readonly host: HTMLElement, private readonly opts: Opts) {
@@ -75,7 +39,7 @@ class View {
   }
 
   private readonly onTheme = (): void => {
-    if (this.theme() === "auto" || this.surface() === "auto") this.syncSurface();
+    if (this.theme() === "auto" || this.surface() === "auto") void this.render();
   };
 
   private async render(): Promise<void> {
@@ -87,35 +51,30 @@ class View {
       this.root.replaceChildren(legacy ? legacy.content.cloneNode(true) : this.scaffold());
       const frame = this.need<HTMLElement>(".frame");
       const grid = this.need<HTMLElement>("[data-unicode-art-root]");
+      const dark = this.surfaceDark(payload);
+      frame.style.setProperty("--surface-bg", dark ? "#24212b" : "#eee7e5");
+      frame.style.setProperty("--surface-fg", dark ? "#f4eff5" : "#201d24");
       grid.style.setProperty("--cols", String(payload.columns));
 
-      const fragment = document.createDocumentFragment();
       for (let y = 0; y < payload.rows; y += 1) {
-        const offset = y * payload.columns;
         const row = document.createElement("div");
         row.className = "row";
-        const text = rowText(payload, y);
-        if (!payload.cellColours) row.textContent = text;
-        else {
-          const bg = gradient(payload.cellColours, offset, payload.columns, true, "transparent");
-          const fg = gradient(payload.cellColours, offset, payload.columns, false, "var(--surface-fg)");
-          if (bg) row.style.backgroundImage = bg;
-          const ink = document.createElement("span");
-          ink.className = fg ? "ink ink-colour" : "ink";
-          ink.textContent = text;
-          if (fg) ink.style.backgroundImage = fg;
-          row.append(ink);
+        for (let x = 0; x < payload.columns; x += 1) {
+          const at = y * payload.columns + x;
+          const cell = document.createElement("span");
+          const colour = payload.cellColours?.[at];
+          cell.className = "cell";
+          cell.textContent = String.fromCodePoint(0x2800 + (payload.masks[at] ?? 0));
+          if (colour?.fg) cell.style.color = css(colour.fg);
+          if (colour?.bg) cell.style.backgroundColor = css(colour.bg);
+          row.append(cell);
         }
-        fragment.append(row);
+        grid.append(row);
       }
-      grid.append(fragment);
 
-      this.columns = payload.columns;
-      this.rows = payload.rows;
-      this.foregroundOnly = payload.colour && !payload.colourBackground && !payload.fullColour;
+      this.payload = payload;
       this.frame = frame;
       this.grid = grid;
-      this.syncSurface();
       requestAnimationFrame(() => this.fit());
       void document.fonts?.ready.then(() => this.fit());
     } catch (err: unknown) {
@@ -155,31 +114,24 @@ class View {
     return unpackEmbedSmall(source, codec);
   }
 
-  private syncSurface(): void {
-    if (!this.frame) return;
-    const dark = this.surfaceDark();
-    this.frame.style.setProperty("--surface-bg", dark ? "#24212b" : "#eee7e5");
-    this.frame.style.setProperty("--surface-fg", dark ? "#f4eff5" : "#201d24");
-  }
-
   private fail(err: unknown): void {
     const frame = document.createElement("div");
     frame.className = "frame";
-    this.frame = frame;
-    this.columns = 0;
-    this.rows = 0;
-    this.foregroundOnly = false;
-    this.syncSurface();
+    const dark = this.surfaceDark();
+    frame.style.setProperty("--surface-bg", dark ? "#24212b" : "#eee7e5");
+    frame.style.setProperty("--surface-fg", dark ? "#f4eff5" : "#201d24");
     const msg = document.createElement("div");
     msg.className = "err";
     msg.textContent = err instanceof Error ? err.message : String(err);
     frame.append(msg);
     this.root.replaceChildren(frame);
+    this.payload = null;
+    this.frame = frame;
     this.grid = null;
   }
 
   private fit(): void {
-    if (!this.columns || !this.rows || !this.frame || !this.grid) return;
+    if (!this.payload || !this.frame || !this.grid) return;
     this.grid.style.fontSize = "10px";
     const probe = document.createElement("span");
     probe.className = "probe";
@@ -189,7 +141,7 @@ class View {
     probe.remove();
     const width = this.frame.clientWidth || this.host.clientWidth;
     const height = this.frame.clientHeight || this.host.clientHeight || width;
-    const target = Math.max(0.5, Math.min(width / this.columns, height / (this.rows * 2)));
+    const target = Math.max(0.5, Math.min(width / this.payload.columns, height / (this.payload.rows * 2)));
     const font = advance > 0 ? 10 * target / advance : 2.5;
     this.grid.style.fontSize = `${font}px`;
     this.grid.style.setProperty("--cell", `${target}px`);
@@ -213,12 +165,12 @@ class View {
     return page === "dark" || (page !== "light" && this.media.matches);
   }
 
-  private surfaceDark(): boolean {
+  private surfaceDark(payload: PackedEmbed | null = this.payload): boolean {
     const surface = this.surface();
     if (surface === "dark") return true;
     if (surface === "light") return false;
     if (this.themeDark()) return true;
-    return this.foregroundOnly;
+    return payload?.colour === true && !payload.colourBackground && !payload.fullColour;
   }
 
   private need<T extends Element>(query: string): T {

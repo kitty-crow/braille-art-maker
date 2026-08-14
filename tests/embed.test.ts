@@ -242,6 +242,5 @@ test("auto embed surface protects foreground-only colour on light themes", async
   expect(runtime).toContain('if (surface === "dark") return true;');
   expect(runtime).toContain('if (surface === "light") return false;');
   expect(runtime).toContain('if (this.themeDark()) return true;');
-  expect(runtime).toContain('this.foregroundOnly = payload.colour && !payload.colourBackground && !payload.fullColour;');
-  expect(runtime).toContain('return this.foregroundOnly;');
+  expect(runtime).toContain('payload?.colour === true && !payload.colourBackground && !payload.fullColour');
 });

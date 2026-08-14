@@ -12,11 +12,11 @@ The embed carries the generated result itself. The source PNG does not need to b
 
 ## Payload
 
-New embeds use the lossless `u4` codec.
+New embeds use the lossless `u4` codec. It searches exact alternatives instead of assuming one representation will always compress best.
 
-Through 256 columns, `u4` searches exact alternatives instead of assuming one representation will always compress best. Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas and bit-plane shuffling. Colour candidates include exact foreground/background pair palettes, bit-packed RGB palettes, spatial RGB residuals and reversible YCoCg residuals. The complete `u3` candidate family remains in the search as a fallback.
+Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas and bit-plane shuffling. Colour candidates include exact foreground/background pair palettes, bit-packed RGB palettes, spatial RGB residuals and reversible YCoCg residuals. The complete `u3` candidate family remains in the search as a fallback.
 
-Above 256 columns, `u4` switches to a bounded-memory exact path. One lossless packed representation is evaluated as raw, maximum-DEFLATE and Brotli quality 11, and the shortest complete transport wins. The high-resolution path deliberately avoids materialising dozens of full-size candidates and therefore also avoids large JavaScript spread/argument-list operations. The representation remains lossless: every Unicode mask and colour value is preserved.
+Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. The shortest actual encoded payload wins. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
 
 The final bytes use safe ASCII basE91. Brotli is the implicit transport and therefore costs no marker byte; raw or DEFLATE carry a tiny marker only when they are genuinely shorter.
 
@@ -28,21 +28,11 @@ Base256/base512 text encodings are not used because non-ASCII code points take m
 
 ## Browser
 
-The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. For outputs above 256 columns, the heavy `Art` object is first persisted to IndexedDB and released from the main-page state. The Worker reads that art directly from IndexedDB instead of receiving a structured-clone copy of the entire high-resolution colour-object graph.
+The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. A progress bar reports the optimisation search while the worker evaluates candidates, so the heavier encoder stays visible without blocking slider interaction. Decoding remains fast in the normal CDN runtime.
 
-A progress bar reports optimisation while the worker runs, so encoding remains visible without blocking slider interaction.
-
-Normal-sized visible fragments are rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer. Very large fragments are kept as one plain `<pre><code>` text node to avoid multiplying memory through Markdown parsing, sanitisation and tokenised highlighting.
+The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
 The consuming site controls the size and position of the outer div. Rendering is isolated in Shadow DOM.
-
-## Runtime rendering
-
-Embeds remain real Unicode text. The runtime does not rasterise the payload, draw it into a canvas or replace it with an image.
-
-The decoded result is rendered one Unicode text row at a time instead of one DOM element per cell. Monochrome rows are plain Unicode text. For colour art, each row still contains the exact Unicode characters; exact per-cell foreground/background paint is represented by sharp CSS gradients aligned to Unicode-cell boundaries. This reduces the DOM from potentially hundreds of thousands of cell spans to roughly one row and one text child per output row.
-
-After those rows have been constructed, the runtime keeps only dimensions and surface state rather than retaining the decoded high-resolution colour-object payload. Theme/surface changes update CSS variables directly and do not require a full payload re-decode.
 
 ## Foreground-only colour on light pages
 
