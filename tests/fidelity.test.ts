@@ -33,6 +33,21 @@ test("compact rows require exact geometry for all 256 Braille glyphs", async () 
   expect(probe).toContain("span.style.letterSpacing = \"0\";");
 });
 
+test("very-high-resolution maker fallback bounds live DOM with fixed Unicode chunks", async () => {
+  const dense = await read("src/web/dense.ts");
+  const css = await read("web/styles/unicode.css");
+  expect(dense).toContain("const chunkAbove = 768;");
+  expect(dense).toContain("const chunkCells = 8;");
+  expect(dense).toContain('type DenseMode = "cells" | "rows" | "chunks";');
+  expect(dense).toContain('return columns > chunkAbove ? "chunks" : "cells";');
+  expect(dense).toContain('chunk.className = "unicode-chunk";');
+  expect(dense).toContain("chunk.style.gridColumn = `span ${count}`;");
+  expect(dense).toContain("fillChunkRow(row, current.source, y, defaultFg)");
+  expect(dense).toContain('host.dataset.unicodeRender = "chunks";');
+  expect(css).toContain('.unicode-grid[data-unicode-render="chunks"] .unicode-row');
+  expect(css).toContain(".unicode-chunk{");
+});
+
 test("maker high-resolution rendering is cooperative, interlaced and never artificially frame-throttled", async () => {
   const dense = await read("src/web/dense.ts");
   expect(dense).toContain("const paintBudgetMs = 12;");
@@ -47,6 +62,7 @@ test("maker high-resolution rendering is cooperative, interlaced and never artif
   expect(dense).not.toContain("const batch =");
   expect(dense).toContain("rowShells(host, current.source.rows)");
   expect(dense).toContain("fillCompactRow(row, current.source, y, defaultFg)");
+  expect(dense).toContain("fillChunkRow(row, current.source, y, defaultFg)");
   expect(dense).toContain("fillCellRow(row, current.source, y)");
   expect(dense).not.toContain("makeArt(");
 });
