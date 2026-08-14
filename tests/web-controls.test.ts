@@ -24,3 +24,16 @@ test("reset sliders restores only the four maker slider defaults", async () => {
   expect(handler).not.toContain("dither.value");
   expect(handler).not.toContain("invert.checked");
 });
+
+test("browser downloads use a SHA-256 content-addressed filename", async () => {
+  const download = await readFile(join(root, "src", "web", "download.ts"), "utf8");
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  expect(download).toContain('crypto.subtle.digest("SHA-256", await blob.arrayBuffer())');
+  expect(download).toContain('kitty-crow-github-io-unicode-art-maker-${hex(digest)}.${suffix}');
+  expect(maker).toContain('download("txt", "text/plain;charset=utf-8"');
+  expect(maker).toContain('download("html", "text/html;charset=utf-8"');
+  expect(maker).toContain('download("svg", "image/svg+xml;charset=utf-8"');
+  expect(maker).not.toContain('download(`${name}.txt`');
+  expect(maker).not.toContain('download(`${name}.html`');
+  expect(maker).not.toContain('download(`${name}.svg`');
+});

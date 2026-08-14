@@ -146,9 +146,9 @@ export const startMaker = (): void => {
   const textOutput = (): string => art ? (art.cellColours ? taggedText(art) : art.text) : "";
   copy.addEventListener("click", async () => { if (!art) return; await navigator.clipboard.writeText(textOutput()); const old = copy.textContent; copy.textContent = "Copied"; setTimeout(() => { copy.textContent = old; }, 900); });
   copyEmbed.addEventListener("click", async () => { if (!embed) return; await navigator.clipboard.writeText(embed); const old = copyEmbed.textContent; copyEmbed.textContent = "Copied embed"; setTimeout(() => { copyEmbed.textContent = old; }, 1100); });
-  txt.addEventListener("click", () => art && download(`${name}.txt`, "text/plain;charset=utf-8", `${textOutput()}\n`));
-  html.addEventListener("click", () => art && download(`${name}.html`, "text/html;charset=utf-8", denseHtml(art, name, 0.02)));
-  svg.addEventListener("click", () => vector?.svg && download(`${name}.svg`, "image/svg+xml;charset=utf-8", vector.svg));
+  txt.addEventListener("click", () => { if (art) void download("txt", "text/plain;charset=utf-8", `${textOutput()}\n`); });
+  html.addEventListener("click", () => { if (art) void download("html", "text/html;charset=utf-8", denseHtml(art, name, 0.02)); });
+  svg.addEventListener("click", () => { if (vector?.svg) void download("svg", "image/svg+xml;charset=utf-8", vector.svg); });
 
   bindCompare(compare, divider);
   bindTooltips();
