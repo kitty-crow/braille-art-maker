@@ -4,13 +4,13 @@ import { packUnicode } from "./unicode.ts";
 import { dither } from "./dither.ts";
 import { resize } from "./resize.ts";
 import { signal } from "./signal.ts";
-import { artSize, maxColumns, minColumns } from "./size.ts";
+import { artSize, minColumns } from "./size.ts";
 import { contrast, otsu, sharpen, stretch } from "./tone.ts";
 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 
 export const makeArt = (pixels: Pixels, cfg: ArtCfg = {}): Art => {
-  const columns = Math.max(minColumns, Math.min(maxColumns, Math.round(cfg.columns ?? Math.max(48, Math.min(112, pixels.width / 5)))));
+  const columns = Math.max(minColumns, Math.round(cfg.columns ?? Math.max(48, Math.min(112, pixels.width / 5))));
   const { dotsWidth, dotsHeight, rows } = artSize(pixels.width, pixels.height, columns);
   const small = resize(pixels, dotsWidth, dotsHeight);
   const { ink, active } = signal(small, cfg.invert ?? true);
