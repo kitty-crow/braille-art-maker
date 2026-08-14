@@ -20,7 +20,9 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 256 horizontal Unicode cells.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 1024 horizontal Unicode cells; resolutions above 256 cells are explicitly experimental because browser rendering, memory use and embed generation can become unreliable or extremely slow.
+
+The Width slider has a resistance notch at 256 cells. A normal pointer drag stops there and shows a pointer-following experimental warning; pushing farther through the notch releases the slider into the 257-1024 range. This warning gate is UI-only: the core/CLI ceiling is 1024.
 
 The hero starts in colour at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
@@ -52,7 +54,7 @@ bun run cli -- image.png --colour --embed -o image-embed.html
 Useful options:
 
 ```text
---columns <n>          Unicode columns, 8-256, default 96
+--columns <n>          Unicode columns, 8-1024, default 96; >256 experimental
 --dither <mode>        atkinson|floyd|ordered|threshold, default ordered
 --invert               inverted polarity, default
 --no-invert            disable inverted polarity
