@@ -1,0 +1,1 @@
+.footer{min-height:78px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:1rem;color:var(--muted);font-size:.84rem;& a{color:var(--accent);font-weight:750;}& .pages-kofi-link{display:inline-flex;align-items:center;gap:.35rem;&>img{display:block;width:1.05rem;height:1.05rem;flex:0 0 auto;object-fit:contain;}}}
