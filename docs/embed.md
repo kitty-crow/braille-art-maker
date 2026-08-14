@@ -12,19 +12,22 @@ The embed carries the already-generated result, so an uploaded PNG does not need
 
 ## Packed payload
 
-Embeds use the versioned `u1` codec rather than literal Unicode/tagged TXT.
+New embeds use the versioned `u2` codec rather than literal Unicode/tagged TXT.
 
 The encoder:
 
 - maps every Unicode cell back to its single 8-bit dot mask
-- run-length encodes repeated masks without expanding high-entropy regions
+- run-length packs repeated masks without expanding high-entropy regions
 - stores foreground/background colour changes as compact state streams
 - stores dimensions and colour-mode flags in the binary header
-- serialises the binary as base64url, whose alphabet is safe inside the embed's data script
+- losslessly DEFLATE-compresses that packed binary
+- serialises only that compressed payload as base64url
 
-The matching decoder lives in `src/embed/codec.ts`, is exported as `unpackEmbed`, and is bundled into `/v1/embed.js`.
+Only the art payload is compressed and encoded. The surrounding embed `<div>`, Shadow DOM `<template>`, stylesheet link, loader and API script references remain plain readable HTML. The encoder and decoder remain normal TypeScript source in `src/embed/codec.ts`.
 
-Base256/base512 Unicode encodings are not used because non-ASCII code points take two or more bytes in UTF-8 HTML. They therefore expand the binary payload despite using fewer visible characters. The binary pack plus base64url is smaller in actual transferred HTML.
+The `u2` decoder is bundled into `/v1/embed.js`. That runtime also retains `u1` decoding, so embeds copied from 0.4.5 continue to render after the CDN runtime updates.
+
+Base256/base512 Unicode encodings are not used because non-ASCII code points take two or more bytes in UTF-8 HTML. They therefore expand the binary payload despite using fewer visible characters.
 
 ## Browser
 
@@ -32,7 +35,7 @@ The maker shows a paste-ready embed div and provides **Copy embed div**. The vis
 
 The fragment contains:
 
-- one compact `u1` payload
+- one compact DEFLATE + base64url `u2` payload
 - theme and surface settings
 - an internal Shadow DOM template
 - links to the versioned stylesheet, loader and bundled API

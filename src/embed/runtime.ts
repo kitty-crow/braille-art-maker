@@ -1,5 +1,5 @@
 import { unpackEmbed } from "./codec.ts";
-import type { PackedEmbed } from "./codec.ts";
+import type { EmbedCodec, PackedEmbed } from "./codec.ts";
 import type { EmbedSurface, EmbedTheme } from "./types.ts";
 
 interface Opts { readonly theme?: EmbedTheme; readonly surface?: EmbedSurface; }
@@ -78,10 +78,11 @@ class View {
   }
 
   private readPayload(): PackedEmbed {
-    const data = this.host.querySelector<HTMLScriptElement>('script[data-unicode-art-data]');
+    const data = this.host.querySelector<HTMLScriptElement>("script[data-unicode-art-data]");
     if (!data) throw new Error("Unicode Art embed data is missing.");
-    if (data.dataset.codec !== "u1") throw new Error("Unicode Art embed codec is not supported.");
-    return unpackEmbed(data.textContent ?? "");
+    const codec = data.dataset.codec;
+    if (codec !== "u1" && codec !== "u2") throw new Error("Unicode Art embed codec is not supported.");
+    return unpackEmbed(data.textContent ?? "", codec as EmbedCodec);
   }
 
   private fail(err: unknown): void {

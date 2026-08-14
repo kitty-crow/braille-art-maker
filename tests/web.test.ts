@@ -80,7 +80,8 @@ test("maker exposes a packed paste-ready embed div", async () => {
   expect(maker).toContain('embed = embedHtml(next, cfg)');
   expect(maker).toContain('embedView.render(embed)');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
-  expect(webEmbed).toContain('data: packEmbed(art, cfg)');
+  expect(webEmbed).toContain('data: packEmbed(art, cfg, embedCodec)');
+  expect(webEmbed).toContain('codec: embedCodec');
   expect(webEmbed).toContain('src: __EMBED_SRC__');
   expect(webEmbed).not.toContain("taggedText");
 });
@@ -129,7 +130,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.5");
+  expect(pkg.version).toBe("0.4.6");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });

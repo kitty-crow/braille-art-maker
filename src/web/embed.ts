@@ -1,4 +1,4 @@
-import { packEmbed } from "../embed/codec.ts";
+import { embedCodec, packEmbed } from "../embed/codec.ts";
 import { Tpl } from "../embed/tpl.ts";
 import type { EmbedSurface, EmbedTheme, EmbedTpl } from "../embed/types.ts";
 import type { Art, ArtCfg } from "../types.ts";
@@ -12,7 +12,8 @@ export const embedHtml = (
   theme: EmbedTheme = "auto",
   surface: EmbedSurface = "auto",
 ): string => fill.make({
-  data: packEmbed(art, cfg),
+  data: packEmbed(art, cfg, embedCodec),
+  codec: embedCodec,
   theme,
   surface,
   src: __EMBED_SRC__,

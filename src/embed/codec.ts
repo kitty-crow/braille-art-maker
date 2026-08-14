@@ -1,4 +1,8 @@
+import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg, CellColour, Rgb } from "../types.ts";
+
+export type EmbedCodec = "u1" | "u2";
+export const embedCodec: EmbedCodec = "u2";
 
 export interface PackedEmbed {
   readonly columns: number;
@@ -72,7 +76,6 @@ const packMasks = (source: Uint8Array, out: number[]): void => {
       i += run;
       continue;
     }
-
     const start = i;
     i += run;
     while (i < source.length && i - start < 128) {
@@ -165,7 +168,7 @@ const unb64 = (source: string): Uint8Array => {
   return out;
 };
 
-export const packEmbed = (art: Art, cfg: ArtCfg): string => {
+const rawPack = (art: Art, cfg: ArtCfg): Uint8Array => {
   const colour = cfg.colour === true;
   const colourBackground = colour && cfg.colourBackground === true;
   const fullColour = colourBackground && cfg.fullColour === true;
@@ -177,11 +180,11 @@ export const packEmbed = (art: Art, cfg: ArtCfg): string => {
   packMasks(masks, out);
   if (colour) packColours(art.cellColours, masks.length, false, out);
   if (colourBackground) packColours(art.cellColours, masks.length, true, out);
-  return b64(Uint8Array.from(out));
+  return Uint8Array.from(out);
 };
 
-export const unpackEmbed = (source: string): PackedEmbed => {
-  const read = new Reader(unb64(source));
+const rawUnpack = (bytes: Uint8Array): PackedEmbed => {
+  const read = new Reader(bytes);
   if (read.byte() !== MAGIC_A || read.byte() !== MAGIC_B) throw new Error("Packed Unicode payload has the wrong signature.");
   if (read.byte() !== VERSION) throw new Error("Packed Unicode payload version is not supported.");
   const flags = read.byte();
@@ -206,4 +209,20 @@ export const unpackEmbed = (source: string): PackedEmbed => {
   }
   if (!read.done) throw new Error("Packed Unicode payload contains trailing data.");
   return { columns, rows, masks, colour, colourBackground, fullColour, ...(cellColours ? { cellColours } : {}) };
+};
+
+export const packEmbed = (art: Art, cfg: ArtCfg, codec: EmbedCodec = embedCodec): string => {
+  const raw = rawPack(art, cfg);
+  return b64(codec === "u2" ? deflateSync(raw, { level: 9 }) : raw);
+};
+
+export const unpackEmbed = (source: string, codec?: EmbedCodec): PackedEmbed => {
+  const encoded = unb64(source);
+  const selected = codec ?? (encoded[0] === MAGIC_A && encoded[1] === MAGIC_B ? "u1" : "u2");
+  if (selected === "u1") return rawUnpack(encoded);
+  try { return rawUnpack(inflateSync(encoded)); }
+  catch (error) {
+    if (error instanceof Error && error.message.startsWith("Packed Unicode")) throw error;
+    throw new Error("Packed Unicode payload could not be decompressed.");
+  }
 };

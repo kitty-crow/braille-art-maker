@@ -6,6 +6,7 @@ export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
     return this.fill(tpl.html, {
       DATA: this.data(cfg.data),
+      CODEC: cfg.codec,
       THEME: cfg.theme,
       SURFACE: cfg.surface,
       STYLE: this.attr(cfg.style ?? STYLE),
