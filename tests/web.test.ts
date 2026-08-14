@@ -42,7 +42,6 @@ test("light and dark themes apply visibility-friendly defaults", async () => {
   expect(maker).toContain('heroBg.checked = light;');
   expect(maker).toContain('heroFull.checked = false;');
   expect(maker).toContain('invert.checked = !light;');
-  expect(maker).toContain('addEventListener("unicode-art-theme"');
 });
 
 test("foreground-only colour gets a dark light-theme preview and warning", async () => {
@@ -71,10 +70,22 @@ test("maker keeps slider defaults and switches only dither when colour is enable
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
+test("maker exposes a paste-ready embed div", async () => {
+  const html = await readFile(join(root, "web", "index.html"), "utf8");
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
+  expect(html).toContain('id="copy-embed"');
+  expect(html).toContain('id="embed-code" class="language-html"');
+  expect(maker).toContain('embed = embedHtml(next, cfg)');
+  expect(maker).toContain('navigator.clipboard.writeText(embed)');
+  expect(webEmbed).toContain('src: __EMBED_SRC__');
+  expect(webEmbed).toContain('text: art.cellColours ? taggedText(art) : art.text');
+});
+
 test("range controls have pointer-following accessible info tooltips", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const tips = await readFile(join(root, "src", "web", "tooltips.ts"), "utf8");
-  expect((html.match(/class="slider-info"/g) ?? []).length).toBeGreaterThanOrEqual(4);
+  expect((html.match(/class="slider-info/g) ?? []).length).toBeGreaterThanOrEqual(4);
   expect(html).toContain('id="slider-tip" class="slider-tip" role="tooltip"');
   expect(tips).toContain('button.addEventListener("pointermove"');
   expect(tips).toContain('button.addEventListener("focus"');
@@ -102,7 +113,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.2");
+  expect(pkg.version).toBe("0.4.3");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });

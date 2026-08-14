@@ -5,4 +5,7 @@ export { vectorStage } from "./vector/stage.ts";
 export { rasterVectorSvg } from "./vector/raster.ts";
 export { denseHtml } from "./html/dense.ts";
 export { taggedText, taggedToAnsi } from "./colour/tagged.ts";
+export { Embed } from "./embed/embed.ts";
+export { Tpl as EmbedTpl } from "./embed/tpl.ts";
+export type { EmbedCfg, EmbedPayload, EmbedSurface, EmbedTheme } from "./embed/types.ts";
 export type { Art, ArtCfg, CellColour, Dither, Pixels, Rgb, VecCfg, VecStage } from "./types.ts";

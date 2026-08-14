@@ -20,11 +20,11 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads and a draggable PNG/Unicode hero comparison.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison.
 
 The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Foreground-only colour uses the dark preview surface in light mode so the result remains visible; the adjacent `?` explains that this is a preview aid.
 
 Colour modes:
 
@@ -40,6 +40,7 @@ bun run cli -- image.png --colour -o image.txt
 bun run cli -- image.png --colour-background -o image.txt
 bun run cli -- image.png --full-colour --html -o image.html
 bun run cli -- image.png --full-colour --ansi
+bun run cli -- image.png --colour --embed -o image-embed.html
 ```
 
 Useful options:
@@ -54,9 +55,27 @@ Useful options:
 --full-colour          adaptive two-colour cells
 --ansi                 emit terminal truecolour escapes
 --html                 self-contained HTML
+--embed                paste-ready CDN embed div
+--embed-src <url>      alternate embed.js location
+--embed-theme <mode>   auto|light|dark
+--embed-surface <mode> auto|light|dark
 --svg <path>           also write the Vectoriser SVG
 -o, --output <path>    write output instead of stdout
 ```
+
+## Embedding
+
+The maker's **Copy embed div** output carries the generated Unicode result itself, so the original PNG does not need to be uploaded or hosted. The small inline loader fetches the versioned runtime and stylesheet from GitHub Pages, mounts into Shadow DOM and keeps the consuming site's CSS isolated from the art.
+
+Published assets:
+
+```text
+https://kitty-crow.github.io/braille-art-maker/v1/embed.js
+https://kitty-crow.github.io/braille-art-maker/v1/embed.css
+https://kitty-crow.github.io/braille-art-maker/v1/load.js
+```
+
+See [Embedding](docs/embed.md).
 
 ## Terminal viewer
 
@@ -78,8 +97,10 @@ src/core/        Unicode signal, tone, dithering and packing
 src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
+src/embed/       embed generator and browser runtime
 src/web/         browser behaviour
 src/cli/         CLI parsing and output
+templates/embed/ paste-ready embed host, CSS and loader
 extras/term/     generic C colour header and terminal viewer
 web/             authored Pages markup and assets
 web/styles/      project CSS split by concern
@@ -100,6 +121,7 @@ vendor/unicode-grid  kitty-crow/braille-qr
 
 - [API](docs/api.md)
 - [CLI](docs/cli.md)
+- [Embedding](docs/embed.md)
 - [Design](docs/design.md)
 - [Web app](docs/web.md)
 

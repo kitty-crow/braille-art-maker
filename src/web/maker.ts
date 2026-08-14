@@ -8,6 +8,7 @@ import { bindCompare } from "./compare.ts";
 import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
 import { download } from "./download.ts";
+import { embedHtml } from "./embed.ts";
 import { decodeImage } from "./image.ts";
 import { bindTooltips } from "./tooltips.ts";
 
@@ -25,9 +26,9 @@ export const startMaker = (): void => {
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
   const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
-  const copy = qs<HTMLButtonElement>("#copy"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out");
+  const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
 
-  let vector: VecStage | null = null, name = "hero", art: Art | null = null, loadGeneration = 0;
+  let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
@@ -60,8 +61,12 @@ export const startMaker = (): void => {
 
   const generateMaker = (): void => {
     if (!vector) return;
-    const next = makeArt(vector.pixels, makerCfg());
+    const cfg = makerCfg();
+    const next = makeArt(vector.pixels, cfg);
     art = next;
+    embed = embedHtml(next, cfg);
+    embedCode.textContent = embed;
+    copyEmbed.disabled = false;
     renderDense(output, next);
     metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${vector.paths} paths${next.cellColours ? " · colour" : ""}`;
     setStatus("Ready");
@@ -128,6 +133,7 @@ export const startMaker = (): void => {
 
   const textOutput = (): string => art ? (art.cellColours ? taggedText(art) : art.text) : "";
   copy.addEventListener("click", async () => { if (!art) return; await navigator.clipboard.writeText(textOutput()); const old = copy.textContent; copy.textContent = "Copied"; setTimeout(() => { copy.textContent = old; }, 900); });
+  copyEmbed.addEventListener("click", async () => { if (!embed) return; await navigator.clipboard.writeText(embed); const old = copyEmbed.textContent; copyEmbed.textContent = "Copied embed"; setTimeout(() => { copyEmbed.textContent = old; }, 1100); });
   txt.addEventListener("click", () => art && download(`${name}.txt`, "text/plain;charset=utf-8", `${textOutput()}\n`));
   html.addEventListener("click", () => art && download(`${name}.html`, "text/html;charset=utf-8", denseHtml(art, name, 0.02)));
   svg.addEventListener("click", () => vector?.svg && download(`${name}.svg`, "image/svg+xml;charset=utf-8", vector.svg));

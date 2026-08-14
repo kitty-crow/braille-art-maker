@@ -1,4 +1,4 @@
-import { chmod, mkdir, rm } from "node:fs/promises";
+import { chmod, cp, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { build as buildPages, load as loadPages } from "../vendor/pages/src/index.ts";
 
@@ -6,20 +6,31 @@ const root = join(import.meta.dir, "..");
 const dist = join(root, "dist");
 const site = join(root, "site");
 const assets = join(site, "assets");
+const api = join(site, "v1");
+const tplDir = join(root, "templates", "embed");
+const cdn = "https://kitty-crow.github.io/braille-art-maker/v1/embed.js";
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 const pages = await loadPages(join(root, "pages.config.ts"));
 await buildPages(pages);
 await mkdir(assets, { recursive: true });
+await mkdir(api, { recursive: true });
 
-const lib = await Bun.build({ entrypoints: [join(root, "src", "index.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"] });
-const cli = await Bun.build({ entrypoints: [join(root, "src", "cli.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"] });
-const web = await Bun.build({ entrypoints: [join(root, "src", "web.ts")], outdir: assets, target: "browser", format: "esm", naming: "app.js", minify: true, sourcemap: "none" });
+const embedTpl = await readFile(join(tplDir, "embed.html"), "utf8");
+const define = { __EMBED_HTML__: JSON.stringify(embedTpl), __EMBED_SRC__: JSON.stringify(cdn) };
+const lib = await Bun.build({ entrypoints: [join(root, "src", "index.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
+const cli = await Bun.build({ entrypoints: [join(root, "src", "cli.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
+const web = await Bun.build({ entrypoints: [join(root, "src", "web.ts")], outdir: assets, target: "browser", format: "esm", naming: "app.js", minify: true, sourcemap: "none", define });
+const embed = await Bun.build({
+  entrypoints: [join(root, "src", "embed", "runtime.ts")], outdir: api, target: "browser", format: "iife", naming: "embed.js", minify: true, sourcemap: "none"
+});
 
-for (const result of [lib, cli, web]) {
+for (const result of [lib, cli, web, embed]) {
   if (result.success) continue;
   for (const log of result.logs) console.error(log);
   throw new Error("Build failed.");
 }
+await cp(join(tplDir, "embed.css"), join(api, "embed.css"));
+await cp(join(tplDir, "load.js"), join(api, "load.js"));
 await chmod(join(dist, "cli.js"), 0o755);
