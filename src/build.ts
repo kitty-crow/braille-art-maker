@@ -23,11 +23,12 @@ const define = { __EMBED_HTML__: JSON.stringify(embedTpl), __EMBED_SRC__: JSON.s
 const lib = await Bun.build({ entrypoints: [join(root, "src", "index.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
 const cli = await Bun.build({ entrypoints: [join(root, "src", "cli.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
 const web = await Bun.build({ entrypoints: [join(root, "src", "web.ts")], outdir: assets, target: "browser", format: "esm", naming: "app.js", minify: true, sourcemap: "none", define });
+const worker = await Bun.build({ entrypoints: [join(root, "src", "web", "embed-worker.ts")], outdir: assets, target: "browser", format: "esm", naming: "embed-worker.js", minify: true, sourcemap: "none", define });
 const embed = await Bun.build({
   entrypoints: [join(root, "src", "embed", "runtime.ts")], outdir: api, target: "browser", format: "iife", naming: "embed.js", minify: true, sourcemap: "none"
 });
 
-for (const result of [lib, cli, web, embed]) {
+for (const result of [lib, cli, web, worker, embed]) {
   if (result.success) continue;
   for (const log of result.logs) console.error(log);
   throw new Error("Build failed.");

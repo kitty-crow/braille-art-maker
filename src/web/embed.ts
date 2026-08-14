@@ -1,21 +1,50 @@
-import { embedCodec } from "../embed/codec.ts";
-import { packEmbedSmall } from "../embed/small-browser.ts";
-import { Tpl } from "../embed/tpl.ts";
-import type { EmbedSurface, EmbedTheme, EmbedTpl } from "../embed/types.ts";
+import type { EmbedSurface, EmbedTheme } from "../embed/types.ts";
 import type { Art, ArtCfg } from "../types.ts";
 
-const fill = new Tpl();
-const tpl: EmbedTpl = { html: __EMBED_HTML__ };
+interface Response {
+  readonly id: number;
+  readonly html?: string;
+  readonly error?: string;
+}
 
-export const embedHtml = async (
+interface Pending {
+  readonly resolve: (value: string) => void;
+  readonly reject: (error: Error) => void;
+}
+
+let nextId = 0;
+let worker: Worker | null = null;
+const pending = new Map<number, Pending>();
+
+const getWorker = (): Worker => {
+  if (worker) return worker;
+  worker = new Worker(new URL("embed-worker.js", import.meta.url), { type: "module" });
+  worker.addEventListener("message", event => {
+    const response = event.data as Response;
+    const wait = pending.get(response.id);
+    if (!wait) return;
+    pending.delete(response.id);
+    if (response.error) wait.reject(new Error(response.error));
+    else if (response.html !== undefined) wait.resolve(response.html);
+    else wait.reject(new Error("Embed worker returned no result."));
+  });
+  worker.addEventListener("error", event => {
+    const error = new Error(event.message || "Embed worker failed.");
+    for (const wait of pending.values()) wait.reject(error);
+    pending.clear();
+    worker?.terminate();
+    worker = null;
+  });
+  return worker;
+};
+
+export const embedHtml = (
   art: Art,
   cfg: ArtCfg,
   theme: EmbedTheme = "auto",
   surface: EmbedSurface = "auto",
-): Promise<string> => fill.make({
-  data: await packEmbedSmall(art, cfg),
-  codec: embedCodec,
-  theme,
-  surface,
-  src: __EMBED_SRC__,
-}, tpl);
+): Promise<string> => new Promise((resolve, reject) => {
+  const id = ++nextId;
+  pending.set(id, { resolve, reject });
+  getWorker().postMessage({ id, art, cfg, theme, surface });
+});

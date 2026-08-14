@@ -84,7 +84,7 @@ class View {
     const data = this.host.querySelector<HTMLScriptElement>("script[data-unicode-art-data]");
     if (!data) throw new Error("Unicode Art embed data is missing.");
     const codec = data.dataset.codec;
-    if (codec !== "u1" && codec !== "u2" && codec !== "u3") throw new Error("Unicode Art embed codec is not supported.");
+    if (codec !== "u1" && codec !== "u2" && codec !== "u3" && codec !== "u4") throw new Error("Unicode Art embed codec is not supported.");
     return unpackEmbedSmall(data.textContent ?? "", codec as EmbedCodec);
   }
 

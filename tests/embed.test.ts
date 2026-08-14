@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { brotliCompressSync, constants } from "node:zlib";
 import { taggedText } from "../src/colour/tagged.ts";
 import { parseArgs } from "../src/cli/args.ts";
-import { bestRaw, embedCodec, packEmbed, unpackEmbed } from "../src/embed/codec.ts";
+import { bestRaw, embedCodec, encodeU3, packEmbed, unpackEmbed } from "../src/embed/codec.ts";
+import { packRawV2Candidates } from "../src/embed/raw.ts";
 import { packEmbedSmall, unpackEmbedSmall } from "../src/embed/small-bun.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 import type { Art, ArtCfg, CellColour } from "../src/types.ts";
@@ -67,6 +69,44 @@ const gradientArt = (): Art => {
   };
 };
 
+const fullColourArt = (): Art => {
+  const columns = 48;
+  const rows = 24;
+  const lines: string[] = [];
+  const cells: CellColour[] = [];
+  const palette = [
+    [{ r: 236, g: 84, b: 132 }, { r: 32, g: 24, b: 38 }],
+    [{ r: 116, g: 90, b: 226 }, { r: 238, g: 218, b: 224 }],
+    [{ r: 63, g: 176, b: 196 }, { r: 24, g: 36, b: 44 }],
+  ] as const;
+  for (let y = 0; y < rows; y += 1) {
+    let line = "";
+    for (let x = 0; x < columns; x += 1) {
+      const at = (Math.floor(x / 6) + Math.floor(y / 4)) % palette.length;
+      const pair = palette[at]!;
+      line += String.fromCodePoint(0x2800 + ((x * 11 + y * 7) & 0xff));
+      cells.push({ fg: pair[0], bg: pair[1] });
+    }
+    lines.push(line);
+  }
+  return { text: lines.join("\n"), columns, rows, dotsWidth: columns * 2, dotsHeight: rows * 4, threshold: 0.5, density: 0.5, cellColours: cells };
+};
+
+const packU3 = (source: Art, config: ArtCfg): string => {
+  let best = "";
+  for (const candidate of packRawV2Candidates(source, config)) {
+    const compressed = new Uint8Array(brotliCompressSync(candidate.bytes, {
+      params: {
+        [constants.BROTLI_PARAM_QUALITY]: 11,
+        [constants.BROTLI_PARAM_SIZE_HINT]: candidate.bytes.length,
+      },
+    }));
+    const encoded = encodeU3(compressed);
+    if (!best || encoded.length < best.length) best = encoded;
+  }
+  return best;
+};
+
 test("u2 remains lossless for legacy embeds", () => {
   const packed = packEmbed(art, cfg, "u2");
   const decoded = unpackEmbed(packed, "u2");
@@ -82,28 +122,42 @@ test("u1 embeds remain decodable", () => {
   expect(unpackEmbed(legacy).cellColours).toEqual(colours);
 });
 
-test("u3 uses adaptive raw packing, Brotli 11 and base85 without losing data", async () => {
+test("u4 searches exact representations and remains lossless", async () => {
   const packed = await packEmbedSmall(art, cfg);
-  const decoded = await unpackEmbedSmall(packed, "u3");
-  expect(embedCodec).toBe("u3");
+  const decoded = await unpackEmbedSmall(packed, "u4");
+  expect(embedCodec).toBe("u4");
   expect(decoded.columns).toBe(art.columns);
   expect(decoded.rows).toBe(art.rows);
   expect([...decoded.masks]).toEqual([255, 255, 63, 63, 255, 255, 0, 0]);
   expect(decoded.cellColours).toEqual(colours);
   expect(packed).not.toContain("⣿");
   expect(packed).not.toContain("<#");
+  expect(packed).not.toContain("<");
+  expect(packed).not.toContain(">");
 });
 
-test("u3 beats u2 on spatially correlated coloured art", async () => {
-  const source = gradientArt();
-  const config: ArtCfg = { colour: true };
-  const u2 = packEmbed(source, config, "u2");
-  const u3 = await packEmbedSmall(source, config);
-  const decoded = await unpackEmbedSmall(u3, "u3");
-  expect(u3.length).toBeLessThan(u2.length);
-  expect(decoded.masks).toEqual((await unpackEmbedSmall(u2, "u2")).masks);
-  expect(decoded.cellColours).toEqual(source.cellColours);
-  expect(bestRaw(source, config).colour).not.toBe("legacy");
+test("u4 beats or matches u3 on representative art", async () => {
+  const cases: readonly [Art, ArtCfg][] = [
+    [repeatedArt(), {}],
+    [gradientArt(), { colour: true }],
+    [fullColourArt(), { colour: true, colourBackground: true, fullColour: true }],
+  ];
+  for (const [source, config] of cases) {
+    const u3 = packU3(source, config);
+    const u4 = await packEmbedSmall(source, config);
+    expect(u4.length).toBeLessThanOrEqual(u3.length);
+    const decoded = await unpackEmbedSmall(u4, "u4");
+    expect(decoded.masks).toEqual((await unpackEmbedSmall(u3, "u3")).masks);
+    expect(decoded.cellColours).toEqual(source.cellColours);
+  }
+});
+
+test("u3 embeds remain decodable after u4", async () => {
+  const legacy = packU3(gradientArt(), { colour: true });
+  const decoded = await unpackEmbedSmall(legacy, "u3");
+  expect(decoded.columns).toBe(64);
+  expect(decoded.rows).toBe(32);
+  expect(decoded.cellColours).toEqual(gradientArt().cellColours);
 });
 
 test("u2 deflates the packed binary before base64url encoding", () => {
@@ -131,7 +185,7 @@ test("embed template leaves scaffolding plain and only encodes the art payload",
     src: "https://example.test/v1/embed.js",
   }, { html: template });
   expect(html).toContain("<div data-unicode-art");
-  expect(html).toContain('data-codec="u3"');
+  expect(html).toContain('data-codec="u4"');
   expect(html).toContain('type="application/octet-stream"');
   expect(html).toContain("https://example.test/v1/embed.css");
   expect(html).toContain("https://example.test/v1/load.js");
@@ -148,22 +202,24 @@ test("CLI embed input parsing does not mistake option values for the PNG", () =>
   expect(args.art.columns).toBe(120);
 });
 
-test("build publishes the versioned CDN runtime and loader", async () => {
+test("build publishes the CDN runtime, worker and Brotli assets", async () => {
   const build = await readFile(join(root, "src", "build.ts"), "utf8");
   const loader = await readFile(join(root, "templates", "embed", "load.js"), "utf8");
   const css = await readFile(join(root, "templates", "embed", "embed.css"), "utf8");
   expect(build).toContain('join(site, "v1")');
   expect(build).toContain('naming: "embed.js"');
+  expect(build).toContain('naming: "embed-worker.js"');
   expect(build).toContain('join(api, "load.js")');
+  expect(build).toContain('join(assets, "brotli_wasm_bg.wasm")');
   expect(loader).toContain("win.UnicodeArt");
   expect(loader).toContain("api.mount(host)");
   expect(css).toContain(":host");
   expect(css).toContain("font-synthesis: none");
 });
 
-test("embed runtime accepts u1, u2 and u3 in shadow DOM", async () => {
+test("embed runtime accepts u1 through u4 in shadow DOM", async () => {
   const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
-  expect(runtime).toContain('codec !== "u1" && codec !== "u2" && codec !== "u3"');
+  expect(runtime).toContain('codec !== "u1" && codec !== "u2" && codec !== "u3" && codec !== "u4"');
   expect(runtime).toContain('unpackEmbedSmall(data.textContent ?? "", codec as EmbedCodec)');
   expect(runtime).toContain('String.fromCodePoint(0x2800 +');
   expect(runtime).toContain('attachShadow({ mode: "open" })');

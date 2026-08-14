@@ -24,9 +24,9 @@ The browser app supports PNG upload, live Unicode preview, dithering, monochrome
 
 The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Light foreground-only colour uses the dark preview surface and automatically inverts polarity to match it; light monochrome/background-coloured output starts non-inverted, while dark mode starts inverted. The Invert checkbox remains manually adjustable afterward.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. **Dark canvas** controls the preview surface independently of the art. It starts from the visibility-friendly automatic choice, but once changed manually the maker keeps the user's canvas choice. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
 
-**Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither and polarity untouched.
+**Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
 
 Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
@@ -71,15 +71,17 @@ Useful options:
 
 ## Embedding
 
-The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u3` codec.
+The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-For each result, the encoder tries multiple exact binary representations: direct/left/up predicted 8-bit Unicode masks, exact RGB state streams, exact colour palettes and exact spatial RGB deltas. Every candidate is compressed with Brotli quality 11 and the smallest actual compressed result wins. Only that art payload is transported as safe ASCII base85.
+`u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
 
-Encoding is intentionally more expensive than decoding. In the browser it is delayed until after the live preview updates, so slider interaction remains responsive.
+Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. The actual shortest final payload wins. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
+
+The final bytes use a safe basE91 transport. Brotli is the implicit/default transport with no extra marker; raw or DEFLATE are selected only when their complete encoded payload is genuinely shorter. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
 
 Only the art payload is compressed/encoded. The surrounding `<div>`, `<template>`, stylesheet link, loader, API script reference, theme and surface settings stay normal readable HTML. The decoder remains part of this repository and is bundled into the published runtime.
 
-The CDN runtime remains backwards-compatible with `u1` and `u2` embeds.
+The CDN runtime remains backwards-compatible with `u1`, `u2` and `u3` embeds.
 
 Literal base256/base512 text encodings are not used because their non-ASCII code points take multiple bytes in UTF-8 HTML and make the transferred fragment larger rather than smaller.
 
@@ -125,7 +127,7 @@ src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
 src/embed/       packed/compressed embed codec, generator and browser runtime
-src/web/         browser behaviour
+src/web/         browser behaviour and embed worker
 src/cli/         CLI parsing and output
 templates/embed/ paste-ready embed host, CSS and loader
 extras/term/     generic C colour header and terminal viewer

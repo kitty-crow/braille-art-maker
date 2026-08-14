@@ -12,25 +12,25 @@ The embed carries the generated result itself. The source PNG does not need to b
 
 ## Payload
 
-New embeds use the lossless `u3` codec. Before compression, the encoder tries several exact representations of the same art:
+New embeds use the lossless `u4` codec. It searches exact alternatives instead of assuming one representation will always compress best.
 
-- direct, left-predicted and up-predicted 8-bit Unicode masks
-- run-packed mask streams
-- legacy RGB state streams
-- exact RGB palettes with compact indices
-- exact left-predicted and up-predicted RGB deltas
+Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas and bit-plane shuffling. Colour candidates include exact foreground/background pair palettes, bit-packed RGB palettes, spatial RGB residuals and reversible YCoCg residuals. The complete `u3` candidate family remains in the search as a fallback.
 
-Each candidate is compressed with Brotli quality 11. The smallest actual Brotli result wins, then the compressed bytes are transported as a safe ASCII base85 string. Encoding is intentionally more expensive than decoding because embed size is prioritised.
+Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. The shortest actual encoded payload wins. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
+
+The final bytes use safe ASCII basE91. Brotli is the implicit transport and therefore costs no marker byte; raw or DEFLATE carry a tiny marker only when they are genuinely shorter.
 
 Only the art payload is packed, compressed and encoded. The surrounding `<div>`, Shadow DOM `<template>`, stylesheet link, loader, API script reference, theme and surface settings remain plain readable HTML.
 
-The runtime still decodes `u1` and `u2`, so previously copied embeds continue to work.
+The runtime still decodes `u1`, `u2` and `u3`, so previously copied embeds continue to work.
 
-Base256/base512 text encodings are not used because non-ASCII code points take multiple bytes in UTF-8 HTML. A safe ASCII transport is smaller in transferred HTML.
+Base256/base512 text encodings are not used because non-ASCII code points take multiple bytes in UTF-8 HTML. A safe single-byte ASCII transport is smaller in transferred HTML.
 
 ## Browser
 
-The maker generates the compact embed after the live Unicode preview has updated, so the heavier encoder does not block slider interaction. The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
+The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. The expensive encoder therefore does not block slider interaction. Decoding remains fast in the normal CDN runtime.
+
+The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
 The consuming site controls the size and position of the outer div. Rendering is isolated in Shadow DOM.
 

@@ -1,9 +1,11 @@
 import { base85Alphabet } from "./base85.ts";
+import { base91Alphabet } from "./base91.ts";
 import type { EmbedCodec } from "./codec.ts";
 import type { EmbedCfg, EmbedTpl } from "./types.ts";
 
 const STYLE = "display:block;width:min(100%,40rem);aspect-ratio:1";
 const base85 = new Set(base85Alphabet);
+const base91 = new Set(base91Alphabet);
 
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
@@ -24,6 +26,11 @@ export class Tpl {
     if (!value) throw new Error("Embed payload is empty.");
     if (codec === "u3") {
       if ([...value].some(char => !base85.has(char))) throw new Error("Embed payload contains unsafe base85 data.");
+      return value;
+    }
+    if (codec === "u4") {
+      const body = value.startsWith("&r") || value.startsWith("&d") ? value.slice(2) : value;
+      if (!body || [...body].some(char => !base91.has(char))) throw new Error("Embed payload contains unsafe base91 data.");
       return value;
     }
     if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Embed payload must be base64url data.");

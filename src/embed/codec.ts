@@ -1,10 +1,12 @@
 import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
 import { base85Decode, base85Encode } from "./base85.ts";
+import { base91Decode, base91Encode } from "./base91.ts";
 import { isRawPayload, packRawV1, packRawV2Candidates, unpackRaw, type PackedEmbed, type RawCandidate } from "./raw.ts";
 
-export type EmbedCodec = "u1" | "u2" | "u3";
-export const embedCodec: EmbedCodec = "u3";
+export type EmbedCodec = "u1" | "u2" | "u3" | "u4";
+export type U4Mode = "r" | "d" | "b";
+export const embedCodec: EmbedCodec = "u4";
 
 const b64 = (bytes: Uint8Array): string => {
   let binary = "";
@@ -56,5 +58,20 @@ export const bestRaw = (art: Art, cfg: ArtCfg): RawCandidate => {
 
 export const encodeU3 = (compressed: Uint8Array): string => base85Encode(compressed);
 export const decodeU3 = (source: string): Uint8Array => base85Decode(source);
+
+export const encodeU4 = (mode: U4Mode, bytes: Uint8Array): string => {
+  const body = base91Encode(bytes);
+  return mode === "b" ? body : `&${mode}${body}`;
+};
+
+export const decodeU4 = (source: string): { mode: U4Mode; bytes: Uint8Array } => {
+  const text = source.trim();
+  if (!text) throw new Error("Packed Unicode u4 payload is empty.");
+  if (!text.startsWith("&")) return { mode: "b", bytes: base91Decode(text) };
+  const mode = text[1];
+  if (mode !== "r" && mode !== "d") throw new Error("Packed Unicode u4 payload has an invalid compression mode.");
+  return { mode, bytes: base91Decode(text.slice(2)) };
+};
+
 export { unpackRaw } from "./raw.ts";
 export type { PackedEmbed, RawCandidate } from "./raw.ts";

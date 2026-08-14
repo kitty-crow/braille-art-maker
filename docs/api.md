@@ -14,4 +14,4 @@ fullColour?: boolean
 
 `packEmbed(art, cfg, codec)` and `unpackEmbed(data, codec)` retain the synchronous `u1`/`u2` compatibility API.
 
-`packEmbedSmall(art, cfg)` creates the current `u3` embed payload. It tries multiple exact mask and colour representations, Brotli-compresses every candidate at quality 11, keeps the smallest result and emits safe ASCII base85. `unpackEmbedSmall(data, codec)` decodes `u3` and also accepts legacy `u1`/`u2` payloads.
+`packEmbedSmall(art, cfg)` creates the current `u4` payload. It searches multiple exact mask and colour representations, compares raw, maximum-DEFLATE and Brotli-11 transports within a bounded search budget, and emits the shortest result as safe ASCII basE91. `unpackEmbedSmall(data, codec)` decodes `u4` and remains compatible with `u1`, `u2` and `u3`.

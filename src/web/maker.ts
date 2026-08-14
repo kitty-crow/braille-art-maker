@@ -25,14 +25,14 @@ export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
-  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), reset = qs<HTMLButtonElement>("#reset-sliders");
+  const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), darkCanvas = qs<HTMLInputElement>("#dark-canvas"), reset = qs<HTMLButtonElement>("#reset-sliders");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
   const embedView = new EmbedView(embedCode);
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
-  let embedGeneration = 0, embedTimer = 0;
+  let embedGeneration = 0, embedTimer = 0, canvasManual = false;
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
   const makerCfg = (): ArtCfg => ({
@@ -47,17 +47,26 @@ export const startMaker = (): void => {
     colour: false, colourBackground: false, fullColour: false
   };
 
-  const darkMakerSurface = (): boolean => activeTheme() === "dark" || (colour.checked && !colourBg.checked);
-  const syncPreviewContrast = (): void => {
-    const darkPreview = activeTheme() === "light" && colour.checked && !colourBg.checked;
-    previewScroll.toggleAttribute("data-contrast-dark", darkPreview);
-    previewInfo.hidden = !darkPreview;
+  const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);
+  const syncCanvas = (): void => {
+    const hazard = activeTheme() === "light" && colour.checked && !colourBg.checked;
+    previewScroll.toggleAttribute("data-contrast-dark", darkCanvas.checked);
+    previewInfo.hidden = !hazard;
+    if (hazard) {
+      previewInfo.dataset.tip = darkCanvas.checked
+        ? "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is on for readability. You can turn it off, but some colours may then be difficult to see unless Colour background is enabled."
+        : "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is off, so some colours may be difficult to see. Enable Dark canvas or Colour background for stronger readability.";
+    }
   };
-  const syncMakerPolarity = (): void => { invert.checked = darkMakerSurface(); };
-  const syncColour = (polarity = false): void => {
+  const applyAutomaticCanvas = (theme: Theme = activeTheme()): void => {
+    if (!canvasManual) darkCanvas.checked = automaticDarkCanvas(theme);
+    syncCanvas();
+  };
+  const syncMakerPolarity = (): void => { invert.checked = darkCanvas.checked; };
+  const syncColour = (polarity = false, theme: Theme = activeTheme()): void => {
     colourBg.disabled = !colour.checked;
     fullColour.disabled = !colour.checked || !colourBg.checked;
-    syncPreviewContrast();
+    applyAutomaticCanvas(theme);
     if (polarity) syncMakerPolarity();
   };
   const syncHeroColour = (): void => {
@@ -70,7 +79,7 @@ export const startMaker = (): void => {
     window.clearTimeout(embedTimer);
     embed = "";
     copyEmbed.disabled = true;
-    embedCode.textContent = "Packing compact embed…";
+    embedCode.textContent = "Optimising compact embed…";
     embedTimer = window.setTimeout(() => {
       void embedHtml(next, cfg).then(value => {
         if (generation !== embedGeneration || art !== next) return;
@@ -106,7 +115,7 @@ export const startMaker = (): void => {
     heroBg.checked = light;
     heroFull.checked = false;
     syncHeroColour();
-    syncColour(true);
+    syncColour(true, theme);
     if (heroPixels) generateHero();
     if (vector) generateMaker();
   };
@@ -141,6 +150,12 @@ export const startMaker = (): void => {
     syncColour(true); schedule();
   });
   for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(true); schedule(); });
+  darkCanvas.addEventListener("change", () => {
+    canvasManual = true;
+    syncCanvas();
+    syncMakerPolarity();
+    schedule();
+  });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   columns.addEventListener("input", () => { columnsOut.value = columns.value; });
   reset.addEventListener("click", () => {
