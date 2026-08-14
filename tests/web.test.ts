@@ -69,10 +69,10 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker keeps slider defaults and switches only dither when colour is enabled", async () => {
+test("maker keeps slider defaults and supports 256 horizontal cells", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(html).toContain('id="columns" type="range" min="24" max="180" step="1" value="96"');
+  expect(html).toContain('id="columns" type="range" min="24" max="256" step="1" value="96"');
   expect(html).toContain('id="contrast" type="range" min="0.55" max="1.9" step="0.01" value="1.12"');
   expect(html).toContain('id="detail" type="range" min="0" max="1.2" step="0.01" value="0.34"');
   expect(html).toContain('id="bias" type="range" min="-0.25" max="0.25" step="0.005" value="0.015"');
