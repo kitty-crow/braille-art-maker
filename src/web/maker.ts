@@ -22,7 +22,7 @@ const activeTheme = (): Theme => {
 export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
-  const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status");
+  const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
   const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out");
@@ -43,9 +43,15 @@ export const startMaker = (): void => {
     colour: false, colourBackground: false, fullColour: false
   };
 
+  const syncPreviewContrast = (): void => {
+    const darkPreview = activeTheme() === "light" && colour.checked && !colourBg.checked;
+    previewScroll.toggleAttribute("data-contrast-dark", darkPreview);
+    previewInfo.hidden = !darkPreview;
+  };
   const syncColour = (): void => {
     colourBg.disabled = !colour.checked;
     fullColour.disabled = !colour.checked || !colourBg.checked;
+    syncPreviewContrast();
   };
   const syncHeroColour = (): void => {
     heroBg.disabled = !heroColour.checked;
@@ -73,6 +79,7 @@ export const startMaker = (): void => {
     heroFull.checked = false;
     invert.checked = !light;
     syncHeroColour();
+    syncPreviewContrast();
     if (heroPixels) generateHero();
     if (vector) generateMaker();
   };

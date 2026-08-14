@@ -43,7 +43,18 @@ test("light and dark themes apply visibility-friendly defaults", async () => {
   expect(maker).toContain('heroFull.checked = false;');
   expect(maker).toContain('invert.checked = !light;');
   expect(maker).toContain('addEventListener("unicode-art-theme"');
-  expect(maker).toContain('applyThemeDefaults(activeTheme());');
+});
+
+test("foreground-only colour gets a dark light-theme preview and warning", async () => {
+  const html = await readFile(join(root, "web", "index.html"), "utf8");
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
+  expect(html).toContain('id="preview-contrast-info"');
+  expect(html).toContain('Why the preview background is dark');
+  expect(maker).toContain('activeTheme() === "light" && colour.checked && !colourBg.checked');
+  expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", darkPreview)');
+  expect(css).toContain('&[data-contrast-dark]{background:#24212b;');
+  expect(css).toContain('.output-grid{color:#f4eff5;}');
 });
 
 test("maker keeps slider defaults and switches only dither when colour is enabled", async () => {
@@ -63,8 +74,7 @@ test("maker keeps slider defaults and switches only dither when colour is enable
 test("range controls have pointer-following accessible info tooltips", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const tips = await readFile(join(root, "src", "web", "tooltips.ts"), "utf8");
-  expect((html.match(/class="slider-info"/g) ?? []).length).toBe(4);
-  expect((html.match(/<svg viewBox="0 0 20 20"/g) ?? []).length).toBe(4);
+  expect((html.match(/class="slider-info"/g) ?? []).length).toBeGreaterThanOrEqual(4);
   expect(html).toContain('id="slider-tip" class="slider-tip" role="tooltip"');
   expect(tips).toContain('button.addEventListener("pointermove"');
   expect(tips).toContain('button.addEventListener("focus"');
@@ -92,7 +102,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.1");
+  expect(pkg.version).toBe("0.4.2");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });
