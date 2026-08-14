@@ -18,7 +18,18 @@ interface DenseState {
 }
 
 const compactAbove = 256;
+const paintBudgetMs = 12;
 const state = new WeakMap<HTMLElement, DenseState>();
+const taskChannel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
+const taskQueue: Array<() => void> = [];
+if (taskChannel) taskChannel.port1.onmessage = () => taskQueue.shift()?.();
+
+const yieldBrowser = (): Promise<void> => {
+  const scheduler = (globalThis as typeof globalThis & { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (scheduler?.yield) return scheduler.yield();
+  if (taskChannel) return new Promise(resolve => { taskQueue.push(resolve); taskChannel.port2.postMessage(0); });
+  return new Promise(resolve => setTimeout(resolve, 0));
+};
 
 const innerSize = (element: HTMLElement): { width: number; height: number } => {
   const style = getComputedStyle(element);
@@ -162,8 +173,6 @@ const renderRows = (host: HTMLElement, source: DenseSource, fit: BrailleFontFit)
   host.style.fontFamily = fit.family;
 };
 
-const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));
-
 const renderInterlaced = async (
   host: HTMLElement,
   current: DenseState,
@@ -174,30 +183,27 @@ const renderInterlaced = async (
   const rows = rowShells(host, current.source.rows);
   const compact = fit !== null;
   const defaultFg = getComputedStyle(host).color || "#201d24";
-  const batch = compact ? 12 : Math.max(1, Math.floor(2048 / current.source.columns));
+  let sliceStart = performance.now();
 
   host.dataset.unicodeRender = compact ? "rows" : "cells";
   if (fit) host.style.fontFamily = fit.family;
   else host.style.removeProperty("font-family");
 
   try {
-    // Interlaced progressive final render: first populate even rows across the whole image,
-    // then fill the odd rows. Every node belongs to the final target-resolution result;
-    // no intermediate-resolution image is computed or discarded.
+    // Interlaced progressive final render: even rows establish image-wide detail, then odd
+    // rows complete it. Yield only when actual work consumes the cooperative time budget;
+    // fast renders finish synchronously with no artificial frame waits or minimum duration.
     for (const parity of [0, 1] as const) {
-      let sinceYield = 0;
       for (let y = parity; y < current.source.rows; y += 2) {
         if (state.get(host) !== current || current.generation !== generation) return;
         const row = rows[y]!;
         if (fit) fillCompactRow(row, current.source, y, defaultFg);
         else fillCellRow(row, current.source, y);
-        sinceYield += 1;
-        if (sinceYield >= batch) {
-          sinceYield = 0;
-          await nextFrame();
+        if (performance.now() - sliceStart >= paintBudgetMs) {
+          await yieldBrowser();
+          sliceStart = performance.now();
         }
       }
-      await nextFrame();
     }
   } finally {
     if (state.get(host) === current && current.generation === generation) current.rendering = false;
