@@ -6,8 +6,9 @@ import { taggedText, taggedToAnsi } from "./colour/tagged.ts";
 import { parseArgs } from "./cli/args.ts";
 import { writeOutput } from "./cli/output.ts";
 import { makeArt } from "./core/art.ts";
-import { embedCodec, packEmbed } from "./embed/codec.ts";
+import { embedCodec } from "./embed/codec.ts";
 import { Embed } from "./embed/embed.ts";
+import { packEmbedSmall } from "./embed/small-bun.ts";
 import { denseHtml } from "./html/dense.ts";
 import { vectorStage } from "./vector/stage.ts";
 
@@ -22,7 +23,7 @@ const tagged = art.cellColours ? taggedText(art) : art.text;
 let body: string;
 if (args.embed) {
   body = `${await new Embed().make({
-    data: packEmbed(art, args.art, embedCodec),
+    data: await packEmbedSmall(art, args.art),
     codec: embedCodec,
     theme: args.embedTheme,
     surface: args.embedSurface,

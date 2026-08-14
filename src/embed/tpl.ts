@@ -1,11 +1,14 @@
+import { base85Alphabet } from "./base85.ts";
+import type { EmbedCodec } from "./codec.ts";
 import type { EmbedCfg, EmbedTpl } from "./types.ts";
 
 const STYLE = "display:block;width:min(100%,40rem);aspect-ratio:1";
+const base85 = new Set(base85Alphabet);
 
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
     return this.fill(tpl.html, {
-      DATA: this.data(cfg.data),
+      DATA: this.data(cfg.data, cfg.codec),
       CODEC: cfg.codec,
       THEME: cfg.theme,
       SURFACE: cfg.surface,
@@ -17,8 +20,13 @@ export class Tpl {
     });
   }
 
-  private data(value: string): string {
-    if (!value || !/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Embed payload must be base64url data.");
+  private data(value: string, codec: EmbedCodec): string {
+    if (!value) throw new Error("Embed payload is empty.");
+    if (codec === "u3") {
+      if ([...value].some(char => !base85.has(char))) throw new Error("Embed payload contains unsafe base85 data.");
+      return value;
+    }
+    if (!/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Embed payload must be base64url data.");
     return value;
   }
 

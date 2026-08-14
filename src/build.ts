@@ -8,6 +8,7 @@ const site = join(root, "site");
 const assets = join(site, "assets");
 const api = join(site, "v1");
 const tplDir = join(root, "templates", "embed");
+const brotliWasm = join(root, "node_modules", "brotli-wasm", "pkg.web", "brotli_wasm_bg.wasm");
 const cdn = "https://kitty-crow.github.io/braille-art-maker/v1/embed.js";
 
 await rm(dist, { recursive: true, force: true });
@@ -31,6 +32,11 @@ for (const result of [lib, cli, web, embed]) {
   for (const log of result.logs) console.error(log);
   throw new Error("Build failed.");
 }
-await cp(join(tplDir, "embed.css"), join(api, "embed.css"));
-await cp(join(tplDir, "load.js"), join(api, "load.js"));
+
+await Promise.all([
+  cp(join(tplDir, "embed.css"), join(api, "embed.css")),
+  cp(join(tplDir, "load.js"), join(api, "load.js")),
+  cp(brotliWasm, join(api, "brotli_wasm_bg.wasm")),
+  cp(brotliWasm, join(assets, "brotli_wasm_bg.wasm")),
+]);
 await chmod(join(dist, "cli.js"), 0o755);

@@ -8,64 +8,49 @@ https://kitty-crow.github.io/braille-art-maker/v1/embed.css
 https://kitty-crow.github.io/braille-art-maker/v1/load.js
 ```
 
-The embed carries the already-generated result, so an uploaded PNG does not need to be hosted or sent anywhere after conversion.
+The embed carries the generated result itself. The source PNG does not need to be hosted or sent anywhere after conversion.
 
-## Packed payload
+## Payload
 
-New embeds use the versioned `u2` codec rather than literal Unicode/tagged TXT.
+New embeds use the lossless `u3` codec. Before compression, the encoder tries several exact representations of the same art:
 
-The encoder:
+- direct, left-predicted and up-predicted 8-bit Unicode masks
+- run-packed mask streams
+- legacy RGB state streams
+- exact RGB palettes with compact indices
+- exact left-predicted and up-predicted RGB deltas
 
-- maps every Unicode cell back to its single 8-bit dot mask
-- run-length packs repeated masks without expanding high-entropy regions
-- stores foreground/background colour changes as compact state streams
-- stores dimensions and colour-mode flags in the binary header
-- losslessly DEFLATE-compresses that packed binary
-- serialises only that compressed payload as base64url
+Each candidate is compressed with Brotli quality 11. The smallest actual Brotli result wins, then the compressed bytes are transported as a safe ASCII base85 string. Encoding is intentionally more expensive than decoding because embed size is prioritised.
 
-Only the art payload is compressed and encoded. The surrounding embed `<div>`, Shadow DOM `<template>`, stylesheet link, loader and API script references remain plain readable HTML. The encoder and decoder remain normal TypeScript source in `src/embed/codec.ts`.
+Only the art payload is packed, compressed and encoded. The surrounding `<div>`, Shadow DOM `<template>`, stylesheet link, loader, API script reference, theme and surface settings remain plain readable HTML.
 
-The `u2` decoder is bundled into `/v1/embed.js`. That runtime also retains `u1` decoding, so embeds copied from 0.4.5 continue to render after the CDN runtime updates.
+The runtime still decodes `u1` and `u2`, so previously copied embeds continue to work.
 
-Base256/base512 Unicode encodings are not used because non-ASCII code points take two or more bytes in UTF-8 HTML. They therefore expand the binary payload despite using fewer visible characters.
+Base256/base512 text encodings are not used because non-ASCII code points take multiple bytes in UTF-8 HTML. A safe ASCII transport is smaller in transferred HTML.
 
 ## Browser
 
-The maker shows a paste-ready embed div and provides **Copy embed div**. The visible code block is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
+The maker generates the compact embed after the live Unicode preview has updated, so the heavier encoder does not block slider interaction. The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
-The fragment contains:
-
-- one compact DEFLATE + base64url `u2` payload
-- theme and surface settings
-- an internal Shadow DOM template
-- links to the versioned stylesheet, loader and bundled API
-
-The consuming site controls the size and position of the outer div. The embed runtime owns the internal geometry and colours.
+The consuming site controls the size and position of the outer div. Rendering is isolated in Shadow DOM.
 
 ## Foreground-only colour on light pages
 
-A foreground-only colour image can become difficult to read on a light surface. With `data-surface="auto"`, the embed therefore uses the dark surface whenever all of these are true:
+With `data-surface="auto"`, a foreground-only colour embed uses the dark surface when the resolved theme is light. This keeps foreground colours readable without adding background colours to the art itself.
 
-- the resolved theme is light
-- colour is enabled
-- background colour is not enabled
-- full colour is not enabled
-
-This is only a presentation surface; it does not add background colours to the Unicode cells.
-
-A consuming site can deliberately opt back into a light surface:
+A site can deliberately force a light surface:
 
 ```html
 <div data-unicode-art data-surface="light" ...>
 ```
 
-or through the API:
+or:
 
 ```js
 UnicodeArt.mount(host, { surface: "light" })
 ```
 
-The site author should only do this when the chosen foreground colours remain readable on a light background.
+Some foreground colours may then be difficult to see.
 
 ## CLI
 
@@ -80,23 +65,19 @@ Use a different published API location:
 bun run cli -- image.png --embed --embed-src "https://example.com/unicode-art/embed.js"
 ```
 
-The CLI derives sibling `embed.css` and `load.js` URLs from the supplied API URL.
-
-Theme and surface can be controlled independently:
+Theme and surface options:
 
 ```text
 --embed-theme auto|light|dark
 --embed-surface auto|light|dark
 ```
 
-A consuming site may also change `data-theme` or `data-surface` on the host div after mounting; the runtime observes those attributes and rerenders.
+The runtime observes `data-theme` and `data-surface`, so either can be changed after mounting.
 
 ## Runtime
-
-The versioned API exposes:
 
 ```js
 window.UnicodeArt.mount(host, { theme: "auto", surface: "auto" })
 ```
 
-The tiny `load.js` bootstrap loads the API once per page and mounts each host. Rendering happens in Shadow DOM and uses the same measured Unicode-cell geometry as the main app.
+The small `load.js` bootstrap loads the API once per page and mounts each host. The runtime decodes the payload, renders in Shadow DOM and uses measured Unicode-cell geometry.

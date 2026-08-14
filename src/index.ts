@@ -6,6 +6,7 @@ export { rasterVectorSvg } from "./vector/raster.ts";
 export { denseHtml } from "./html/dense.ts";
 export { taggedText, taggedToAnsi } from "./colour/tagged.ts";
 export { embedCodec, packEmbed, unpackEmbed } from "./embed/codec.ts";
-export type { EmbedCodec, PackedEmbed } from "./embed/codec.ts";
+export { packEmbedSmall, unpackEmbedSmall } from "./embed/small-bun.ts";
+export type { EmbedCodec, PackedEmbed, RawCandidate } from "./embed/codec.ts";
 export type { EmbedSurface, EmbedTheme } from "./embed/types.ts";
 export type { Art, ArtCfg, CellColour, Dither, Pixels, Rgb, VecCfg, VecStage } from "./types.ts";
