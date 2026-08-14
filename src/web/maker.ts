@@ -1,6 +1,5 @@
 import { taggedText } from "../colour/tagged.ts";
 import { makeArt } from "../core/art.ts";
-import { maxColumns } from "../core/size.ts";
 import { denseHtml } from "../html/dense.ts";
 import type { Art, ArtCfg, Dither, Pixels, VecStage } from "../types.ts";
 import { vectorStage } from "../vector/stage.ts";
@@ -41,7 +40,7 @@ export const startMaker = (): void => {
     colour: colour.checked, colourBackground: colour.checked && colourBg.checked, fullColour: colour.checked && colourBg.checked && fullColour.checked
   });
   const heroCfg = (): ArtCfg => heroColour.checked ? {
-    columns: maxColumns, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson", invert: true,
+    columns: 256, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson", invert: true,
     colour: true, colourBackground: heroBg.checked, fullColour: heroBg.checked && heroFull.checked
   } : {
     columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered", invert: true,
@@ -57,12 +56,13 @@ export const startMaker = (): void => {
   };
   const syncCanvas = (theme: Theme = activeTheme()): void => {
     const dark = canvasDark(theme);
-    const hazard = theme === "light" && colour.checked && !colourBg.checked;
-    previewScroll.toggleAttribute("data-contrast-dark", dark);
+    const hazard = !dark && colour.checked && !colourBg.checked;
+    previewScroll.toggleAttribute("data-canvas-dark", dark);
+    previewScroll.toggleAttribute("data-canvas-light", !dark);
     previewInfo.hidden = !hazard;
     if (hazard) {
-      previewInfo.dataset.tip = dark
-        ? "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is on for readability. You can turn it off, but some colours may then be difficult to see unless Colour background is enabled."
+      previewInfo.dataset.tip = theme === "dark"
+        ? "Foreground-only coloured Unicode can be hard to see on a light surface. Light canvas is on, so some colours may be difficult to see. Turn Light canvas off or enable Colour background for stronger readability."
         : "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is off, so some colours may be difficult to see. Enable Dark canvas or Colour background for stronger readability.";
     }
   };
