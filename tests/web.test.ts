@@ -21,13 +21,14 @@ test("ordered dithering and inverted polarity remain core and CLI defaults", asy
   expect(args).toContain('value("--dither") ?? "ordered"'); expect(args).toContain('!args.includes("--no-invert")');
 });
 
-test("hero uses detailed colour and restores monochrome defaults", async () => {
+test("hero uses detailed colour without inheriting the maker maximum", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   expect(html).toContain('id="hero-colour" type="checkbox" checked');
   expect(html).toContain('id="hero-background" type="checkbox" checked');
   expect(html).toContain('id="hero-full-colour" type="checkbox">');
-  expect(maker).toContain('columns: maxColumns, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson"');
+  expect(maker).toContain('columns: 256, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson"');
+  expect(maker).not.toContain('columns: maxColumns');
   expect(maker).toContain('columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered"');
 });
 
@@ -44,20 +45,29 @@ test("light and dark themes apply visibility-friendly defaults", async () => {
   expect(maker).toContain('syncColour(true, theme);');
 });
 
-test("canvas toggle reverses its action in dark mode and foreground-only colour stays warned", async () => {
+test("canvas toggle is the first checkbox and forces the opposite surface in each theme", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
-  expect(html).toContain('id="canvas-toggle" type="checkbox"');
+  const canvasAt = html.indexOf('id="canvas-toggle"');
+  const invertAt = html.indexOf('id="invert"');
+  const colourAt = html.indexOf('id="colour"');
+  expect(canvasAt).toBeGreaterThan(-1);
+  expect(canvasAt).toBeLessThan(invertAt);
+  expect(canvasAt).toBeLessThan(colourAt);
   expect(html).toContain('id="canvas-toggle-label">Dark canvas</span>');
   expect(html).toContain('id="preview-contrast-info"');
   expect(maker).toContain('const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);');
   expect(maker).toContain('canvasToggleLabel.textContent = darkTheme ? "Light canvas" : "Dark canvas";');
   expect(maker).toContain('canvasToggle.checked = darkTheme ? !dark : dark;');
-  expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", dark);');
+  expect(maker).toContain('previewScroll.toggleAttribute("data-canvas-dark", dark);');
+  expect(maker).toContain('previewScroll.toggleAttribute("data-canvas-light", !dark);');
+  expect(maker).toContain('const hazard = !dark && colour.checked && !colourBg.checked;');
   expect(maker).toContain('manualCanvasDark = canvasDark();');
+  expect(maker).toContain('Light canvas is on, so some colours may be difficult to see.');
   expect(maker).toContain('Dark canvas is off, so some colours may be difficult to see.');
-  expect(css).toContain('&[data-contrast-dark]{background:#24212b;');
+  expect(css).toContain('&[data-canvas-light]{background:#f8f5fa;');
+  expect(css).toContain('&[data-canvas-dark]{background:#24212b;');
   expect(css).toContain('.output-grid{color:#f4eff5;}');
 });
 
@@ -65,14 +75,15 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   expect(maker).toContain('const syncMakerPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };');
   expect(maker).toContain('canvasToggle.addEventListener("change"');
+  expect(maker).toContain('syncCanvas();');
   expect(maker).toContain('syncMakerPolarity();');
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker keeps slider defaults and supports 256 horizontal cells", async () => {
+test("maker keeps slider defaults and supports 1024 horizontal cells", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(html).toContain('id="columns" type="range" min="24" max="256" step="1" value="96"');
+  expect(html).toContain('id="columns" type="range" min="24" max="1024" step="1" value="96"');
   expect(html).toContain('id="contrast" type="range" min="0.55" max="1.9" step="0.01" value="1.12"');
   expect(html).toContain('id="detail" type="range" min="0" max="1.2" step="0.01" value="0.34"');
   expect(html).toContain('id="bias" type="range" min="-0.25" max="0.25" step="0.005" value="0.015"');
