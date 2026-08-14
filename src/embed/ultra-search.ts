@@ -10,7 +10,6 @@ export type PackProgressFn = (progress: PackProgress) => void;
 
 interface Scored {
   readonly bytes: Uint8Array;
-  readonly deflated: Uint8Array;
   readonly score: number;
 }
 
@@ -78,7 +77,7 @@ export const packU4 = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackP
     const compressed = deflate(candidate.bytes);
     consider(encodeU4("d", compressed));
     step();
-    return { bytes: candidate.bytes, deflated: compressed, score: compressed.length };
+    return { bytes: candidate.bytes, score: compressed.length };
   });
 
   ultra.sort((a, b) => a.score - b.score || a.bytes.length - b.bytes.length);
