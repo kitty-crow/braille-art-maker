@@ -1,0 +1,9 @@
+[submodule "vendor/pages"]
+	path = vendor/pages
+	url = https://github.com/kitty-crow/github-pages-template
+[submodule "vendor/vectoriser"]
+	path = vendor/vectoriser
+	url = https://github.com/kitty-crow/vectoriser
+[submodule "vendor/braille-qr"]
+	path = vendor/braille-qr
+	url = https://github.com/kitty-crow/braille-qr
