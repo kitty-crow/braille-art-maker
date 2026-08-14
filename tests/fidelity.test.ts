@@ -103,7 +103,7 @@ test("high-resolution browser encoding transfers one bounded raw buffer instead 
   const raw = await read("src/embed/bounded-raw.ts");
   const worker = await read("src/web/embed-worker.ts");
   expect(web).toContain("const transferAbove = 256;");
-  expect(web).toContain("const raw = packBoundedRaw(art, cfg);");
+  expect(web).toContain("const raw = preparedRaw ?? packBoundedRaw(art, cfg);");
   expect(web).toContain("[raw.buffer as ArrayBuffer]");
   expect(web).toContain("const oneShot = art.columns > transferAbove;");
   expect(web).toContain("if (wait.oneShot && pending.size === 0) disposeWorker();");
@@ -115,7 +115,7 @@ test("high-resolution browser encoding transfers one bounded raw buffer instead 
 test("high-resolution preview finishes before embed compression starts", async () => {
   const maker = await read("src/web/maker.ts");
   const renderAt = maker.indexOf("await renderDense(output, next);");
-  const embedAt = maker.indexOf("scheduleEmbed(next, cfg, embedLocal);");
+  const embedAt = maker.indexOf("scheduleEmbed(next, cfg, embedLocal, id");
   expect(renderAt).toBeGreaterThan(-1);
   expect(embedAt).toBeGreaterThan(renderAt);
   expect(maker).toContain("cancelEmbedHtml();");
