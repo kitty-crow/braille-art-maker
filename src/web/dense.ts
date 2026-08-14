@@ -3,7 +3,6 @@ import { rgbHex } from "../colour/space.ts";
 import { exactBrailleFont, type BrailleFontFit } from "./braille-font.ts";
 
 interface DenseSource {
-  readonly text: string;
   readonly colours?: readonly CellColour[];
   readonly lines: readonly string[];
   readonly columns: number;
@@ -87,7 +86,6 @@ const sourceOf = (source: string | Art): DenseSource => {
   const text = typeof source === "string" ? source : source.text;
   const lines = text.split("\n");
   return {
-    text,
     lines,
     columns: typeof source === "string" ? stringColumns(lines) : source.columns,
     rows: typeof source === "string" ? Math.max(1, lines.length) : source.rows,
@@ -150,8 +148,8 @@ const renderRows = (host: HTMLElement, source: DenseSource, fit: BrailleFontFit)
 
 export const fitDense = (host: HTMLElement): void => {
   const current = state.get(host);
-  const columns = current?.source.columns ?? Number(host.style.getPropertyValue("--cols")) || 1;
-  const rows = current?.source.rows ?? Number(host.style.getPropertyValue("--rows")) || 1;
+  const columns = current?.source.columns ?? (Number(host.style.getPropertyValue("--cols")) || 1);
+  const rows = current?.source.rows ?? (Number(host.style.getPropertyValue("--rows")) || 1);
   const target = targetFor(host, columns, rows);
   if (!(target > 0)) return;
 
