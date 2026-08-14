@@ -1,7 +1,7 @@
 import brotliPromise from "brotli-wasm";
 import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { decodeU3, decodeU4, encodeU4, encodeU4Cjk, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
+import { decodeU3, decodeU4, encodeU4, encodeU4J, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
 import { isUltraRaw, unpackUltra } from "./ultra-raw.ts";
 import { packU4, type PackProgressFn } from "./ultra-search.ts";
 
@@ -21,7 +21,7 @@ export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgress
   const consider = (value: string): void => { if (!best || value.length < best.length) best = value; };
   const considerTransports = (mode: U4Mode, bytes: Uint8Array): void => {
     consider(encodeU4(mode, bytes));
-    consider(encodeU4Cjk(mode, bytes));
+    consider(encodeU4J(mode, bytes));
   };
 
   progress?.({ done: 0, total });
