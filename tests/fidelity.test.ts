@@ -11,7 +11,7 @@ test("compact maker rows are forbidden through the stable 256-cell range", async
   expect(dense).toContain("const compactAbove = 256;");
   expect(dense).toContain("if (next.columns <= compactAbove)");
   expect(dense).toContain("renderCells(host, next);");
-  expect(dense).toContain("if (current && columns > compactAbove) fit = exactBrailleFont(host, target);");
+  expect(dense).toContain("const fit = columns > compactAbove ? exactBrailleFont(host, target) : null;");
   expect(dense).toContain('cell.className = "unicode-cell";');
   expect(dense).toContain('host.dataset.unicodeRender = "cells";');
   expect(dense).toContain('host.dataset.unicodeRender = "rows";');
@@ -33,13 +33,27 @@ test("compact rows require exact geometry for all 256 Braille glyphs", async () 
   expect(probe).toContain("span.style.letterSpacing = \"0\";");
 });
 
-test("embed runtime has the same proof gate and preserves legacy exact rendering", async () => {
+test("maker high-resolution rendering is asynchronous, interlaced and accumulates the final DOM", async () => {
+  const dense = await read("src/web/dense.ts");
+  expect(dense).toContain("const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));");
+  expect(dense).toContain("for (const parity of [0, 1] as const)");
+  expect(dense).toContain("for (let y = parity; y < current.source.rows; y += 2)");
+  expect(dense).toContain("await nextFrame();");
+  expect(dense).toContain("rowShells(host, current.source.rows)");
+  expect(dense).toContain("fillCompactRow(row, current.source, y, defaultFg)");
+  expect(dense).toContain("fillCellRow(row, current.source, y)");
+  expect(dense).not.toContain("makeArt(");
+});
+
+test("embed runtime has the same proof gate and progressive exact rendering fallback", async () => {
   const runtime = await read("src/embed/runtime.ts");
   const css = await read("templates/embed/embed.css");
   expect(runtime).toContain("const compactAbove = 256;");
   expect(runtime).toContain("this.compactAllowed = legacy === null;");
-  expect(runtime).toContain("this.compactAllowed && this.payload.columns > compactAbove ? exactBrailleFont(this.grid, target) : null");
-  expect(runtime).toContain("else this.renderCells(this.payload);");
+  expect(runtime).toContain("this.compactAllowed && payload.columns > compactAbove ? exactBrailleFont(this.grid, target) : null");
+  expect(runtime).toContain("for (const parity of [0, 1] as const)");
+  expect(runtime).toContain("for (let y = parity; y < payload.rows; y += 2)");
+  expect(runtime).toContain("await nextFrame();");
   expect(runtime).toContain('cell.className = "cell";');
   expect(css).toContain("grid-template-columns: repeat(var(--cols), var(--cell));");
   expect(css).toContain('.grid[data-unicode-render="rows"] .row');
@@ -51,4 +65,49 @@ test("high-resolution u4 avoids the unsafe ultra candidate family", async () => 
   expect(search).toContain("if (art.columns > fullSearchColumns) return packBounded(art, cfg, brotli, progress);");
   expect(search).toContain("const candidates = packRawV2Candidates(art, cfg);");
   expect(search).not.toContain("readonly deflated:");
+});
+
+test("high-resolution browser encoding transfers one bounded raw buffer instead of cloning Art", async () => {
+  const web = await read("src/web/embed.ts");
+  const raw = await read("src/embed/bounded-raw.ts");
+  const worker = await read("src/web/embed-worker.ts");
+  expect(web).toContain("const transferAbove = 256;");
+  expect(web).toContain("const raw = packBoundedRaw(art, cfg);");
+  expect(web).toContain("[raw.buffer as ArrayBuffer]");
+  expect(web).toContain("const oneShot = art.columns > transferAbove;");
+  expect(web).toContain("if (wait.oneShot && pending.size === 0) disposeWorker();");
+  expect(raw).toContain("const chunkSize = 64 * 1024;");
+  expect(raw).toContain("export const packBoundedRaw");
+  expect(worker).toContain("packRawEmbedSmall");
+});
+
+test("high-resolution preview finishes before embed compression starts", async () => {
+  const maker = await read("src/web/maker.ts");
+  const renderAt = maker.indexOf("await renderDense(output, next);");
+  const embedAt = maker.indexOf("scheduleEmbed(next, cfg, embedLocal);");
+  expect(renderAt).toBeGreaterThan(-1);
+  expect(embedAt).toBeGreaterThan(renderAt);
+  expect(maker).toContain("cancelEmbedHtml();");
+  expect(maker).toContain("Generating high-resolution art…");
+});
+
+test("resolution input commits rendering only after interaction settles", async () => {
+  const gate = await read("src/web/resolution.ts");
+  expect(gate).toContain("const commit = (): void =>");
+  expect(gate).toContain('input.addEventListener("change", commit);');
+  expect(gate).toContain('valueInput.addEventListener("change", commitManual);');
+  expect(gate).toContain('valueInput.addEventListener("blur", commitManual);');
+  expect(gate).toContain('if (event.key !== "Enter") return;');
+  expect(gate).toContain("commit();");
+  const inputHandler = gate.match(/input\.addEventListener\("input", \(\) => \{([\s\S]*?)\n  \}\);/u)?.[1] ?? "";
+  expect(inputHandler).not.toContain("onCommit()");
+  const numericHandler = gate.match(/valueInput\.addEventListener\("input", \(\) => \{([\s\S]*?)\n  \}\);/u)?.[1] ?? "";
+  expect(numericHandler).not.toContain("onCommit()");
+});
+
+test("all source pages preserve the mobile viewport contract", async () => {
+  const expected = '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">';
+  for (const path of ["web/index.html", "web/about/index.html", "web/readme/index.html", "web/404.html"]) {
+    expect(await read(path)).toContain(expected);
+  }
 });

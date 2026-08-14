@@ -1,7 +1,7 @@
 import brotliPromise from "brotli-wasm";
-import { inflateSync } from "fflate";
+import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { decodeU3, decodeU4, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed } from "./codec.ts";
+import { decodeU3, decodeU4, encodeU4, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed } from "./codec.ts";
 import { isUltraRaw, unpackUltra } from "./ultra-raw.ts";
 import { packU4, type PackProgressFn } from "./ultra-search.ts";
 
@@ -10,6 +10,24 @@ const unpackBytes = (bytes: Uint8Array): PackedEmbed => isUltraRaw(bytes) ? unpa
 export const packEmbedSmall = async (art: Art, cfg: ArtCfg, progress?: PackProgressFn): Promise<string> => {
   const brotli = await brotliPromise;
   return packU4(art, cfg, bytes => brotli.compress(bytes, { quality: 11 }), progress);
+};
+
+export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgressFn): Promise<string> => {
+  const brotli = await brotliPromise;
+  const total = 3;
+  let done = 0;
+  let best = "";
+  const step = (): void => progress?.({ done: ++done, total });
+  const consider = (value: string): void => { if (!best || value.length < best.length) best = value; };
+
+  progress?.({ done: 0, total });
+  consider(encodeU4("r", raw));
+  step();
+  consider(encodeU4("d", deflateSync(raw, { level: 9, mem: 12 })));
+  step();
+  consider(encodeU4("b", brotli.compress(raw, { quality: 11 })));
+  step();
+  return best;
 };
 
 export const unpackEmbedSmall = async (source: string, codec: EmbedCodec): Promise<PackedEmbed> => {

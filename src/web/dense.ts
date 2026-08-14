@@ -13,6 +13,8 @@ interface DenseState {
   readonly source: DenseSource;
   mode: "cells" | "rows" | null;
   family: string | null;
+  rendering: boolean;
+  generation: number;
 }
 
 const compactAbove = 256;
@@ -100,71 +102,123 @@ const paint = (cell: HTMLElement, colour?: CellColour): void => {
 
 const padded = (source: DenseSource, y: number): string => [...(source.lines[y] ?? "").padEnd(source.columns, "⠀")].slice(0, source.columns).join("");
 
-const renderCells = (host: HTMLElement, source: DenseSource): void => {
+const fillCellRow = (row: HTMLElement, source: DenseSource, y: number): void => {
   const fragment = document.createDocumentFragment();
-  let ci = 0;
-  for (let y = 0; y < source.rows; y += 1) {
+  let x = 0;
+  for (const char of padded(source, y)) {
+    const cell = document.createElement("span");
+    cell.className = "unicode-cell";
+    cell.textContent = char;
+    paint(cell, source.colours?.[y * source.columns + x]);
+    fragment.appendChild(cell);
+    x += 1;
+  }
+  row.replaceChildren(fragment);
+};
+
+const fillCompactRow = (row: HTMLElement, source: DenseSource, y: number, defaultFg: string): void => {
+  const text = padded(source, y);
+  if (!source.colours) {
+    row.textContent = text;
+    return;
+  }
+
+  const offset = y * source.columns;
+  const bg = gradient(source.colours, offset, source.columns, true, "transparent");
+  const fg = gradient(source.colours, offset, source.columns, false, defaultFg);
+  if (bg) row.style.backgroundImage = bg;
+  const ink = document.createElement("span");
+  ink.className = fg ? "unicode-ink unicode-ink-colour" : "unicode-ink";
+  ink.textContent = text;
+  if (fg) ink.style.backgroundImage = fg;
+  row.replaceChildren(ink);
+};
+
+const rowShells = (host: HTMLElement, rows: number): HTMLElement[] => {
+  const fragment = document.createDocumentFragment();
+  const out: HTMLElement[] = [];
+  for (let y = 0; y < rows; y += 1) {
     const row = document.createElement("div");
     row.className = "unicode-row";
-    for (const char of padded(source, y)) {
-      const cell = document.createElement("span");
-      cell.className = "unicode-cell";
-      cell.textContent = char;
-      paint(cell, source.colours?.[ci++]);
-      row.appendChild(cell);
-    }
+    out.push(row);
     fragment.appendChild(row);
   }
   host.replaceChildren(fragment);
+  return out;
+};
+
+const renderCells = (host: HTMLElement, source: DenseSource): void => {
+  const rows = rowShells(host, source.rows);
+  for (let y = 0; y < source.rows; y += 1) fillCellRow(rows[y]!, source, y);
   host.dataset.unicodeRender = "cells";
   host.style.removeProperty("font-family");
 };
 
 const renderRows = (host: HTMLElement, source: DenseSource, fit: BrailleFontFit): void => {
-  const fragment = document.createDocumentFragment();
+  const rows = rowShells(host, source.rows);
   const defaultFg = getComputedStyle(host).color || "#201d24";
-  for (let y = 0; y < source.rows; y += 1) {
-    const row = document.createElement("div");
-    row.className = "unicode-row";
-    const text = padded(source, y);
-    if (!source.colours) row.textContent = text;
-    else {
-      const offset = y * source.columns;
-      const bg = gradient(source.colours, offset, source.columns, true, "transparent");
-      const fg = gradient(source.colours, offset, source.columns, false, defaultFg);
-      if (bg) row.style.backgroundImage = bg;
-      const ink = document.createElement("span");
-      ink.className = fg ? "unicode-ink unicode-ink-colour" : "unicode-ink";
-      ink.textContent = text;
-      if (fg) ink.style.backgroundImage = fg;
-      row.appendChild(ink);
-    }
-    fragment.appendChild(row);
-  }
-  host.replaceChildren(fragment);
+  for (let y = 0; y < source.rows; y += 1) fillCompactRow(rows[y]!, source, y, defaultFg);
   host.dataset.unicodeRender = "rows";
   host.style.fontFamily = fit.family;
 };
 
-export const fitDense = (host: HTMLElement): void => {
-  const current = state.get(host);
-  const columns = current?.source.columns ?? (Number(host.style.getPropertyValue("--cols")) || 1);
-  const rows = current?.source.rows ?? (Number(host.style.getPropertyValue("--rows")) || 1);
-  const target = targetFor(host, columns, rows);
-  if (!(target > 0)) return;
+const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));
 
-  let fit: BrailleFontFit | null = null;
-  if (current && columns > compactAbove) fit = exactBrailleFont(host, target);
-  const mode: "cells" | "rows" = fit ? "rows" : "cells";
+const renderInterlaced = async (
+  host: HTMLElement,
+  current: DenseState,
+  fit: BrailleFontFit | null,
+): Promise<void> => {
+  const generation = ++current.generation;
+  current.rendering = true;
+  const rows = rowShells(host, current.source.rows);
+  const compact = fit !== null;
+  const defaultFg = getComputedStyle(host).color || "#201d24";
+  const batch = compact ? 12 : Math.max(1, Math.floor(2048 / current.source.columns));
 
-  if (current) {
-    const family = fit?.family ?? null;
-    if (current.mode !== mode || (mode === "rows" && current.family !== family)) {
-      if (fit) renderRows(host, current.source, fit);
-      else renderCells(host, current.source);
-      current.mode = mode;
-      current.family = family;
+  host.dataset.unicodeRender = compact ? "rows" : "cells";
+  if (fit) host.style.fontFamily = fit.family;
+  else host.style.removeProperty("font-family");
+
+  try {
+    // Interlaced progressive final render: first populate even rows across the whole image,
+    // then fill the odd rows. Every node belongs to the final target-resolution result;
+    // no intermediate-resolution image is computed or discarded.
+    for (const parity of [0, 1] as const) {
+      let sinceYield = 0;
+      for (let y = parity; y < current.source.rows; y += 2) {
+        if (state.get(host) !== current || current.generation !== generation) return;
+        const row = rows[y]!;
+        if (fit) fillCompactRow(row, current.source, y, defaultFg);
+        else fillCellRow(row, current.source, y);
+        sinceYield += 1;
+        if (sinceYield >= batch) {
+          sinceYield = 0;
+          await nextFrame();
+        }
+      }
+      await nextFrame();
     }
+  } finally {
+    if (state.get(host) === current && current.generation === generation) current.rendering = false;
+  }
+};
+
+const applyGeometry = (host: HTMLElement, current: DenseState, allowRender: boolean): BrailleFontFit | null => {
+  const columns = current.source.columns;
+  const rows = current.source.rows;
+  const target = targetFor(host, columns, rows);
+  if (!(target > 0)) return null;
+
+  const fit = columns > compactAbove ? exactBrailleFont(host, target) : null;
+  const mode: "cells" | "rows" = fit ? "rows" : "cells";
+  const family = fit?.family ?? null;
+
+  if (allowRender && !current.rendering && (current.mode !== mode || (mode === "rows" && current.family !== family))) {
+    if (fit) renderRows(host, current.source, fit);
+    else renderCells(host, current.source);
+    current.mode = mode;
+    current.family = family;
   }
 
   const fontPx = fit?.fontPx ?? legacyFont(host, target);
@@ -173,25 +227,34 @@ export const fitDense = (host: HTMLElement): void => {
   host.style.setProperty("--unicode-font", `${fontPx}px`);
   host.style.width = `${columns * target}px`;
   host.style.height = `${rows * target * 2}px`;
+  return fit;
 };
 
-export const renderDense = (host: HTMLElement, source: string | Art): void => {
+export const fitDense = (host: HTMLElement): void => {
+  const current = state.get(host);
+  if (!current) return;
+  applyGeometry(host, current, true);
+};
+
+export const renderDense = async (host: HTMLElement, source: string | Art): Promise<void> => {
   const next = sourceOf(source);
-  const current: DenseState = { source: next, mode: null, family: null };
+  const current: DenseState = { source: next, mode: null, family: null, rendering: false, generation: 0 };
   state.set(host, current);
   host.replaceChildren();
   host.style.setProperty("--cols", String(next.columns));
   host.style.setProperty("--rows", String(next.rows));
 
+  const fit = applyGeometry(host, current, false);
+  const mode: "cells" | "rows" = fit ? "rows" : "cells";
+  current.mode = mode;
+  current.family = fit?.family ?? null;
+
   if (next.columns <= compactAbove) {
     renderCells(host, next);
-    current.mode = "cells";
+    applyGeometry(host, current, false);
+    return;
   }
-  fitDense(host);
 
-  if (current.mode === null) {
-    renderCells(host, next);
-    current.mode = "cells";
-    fitDense(host);
-  }
+  await renderInterlaced(host, current, fit);
+  if (state.get(host) === current) applyGeometry(host, current, true);
 };

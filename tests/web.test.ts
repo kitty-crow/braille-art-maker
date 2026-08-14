@@ -134,11 +134,14 @@ test("maker packs paste-ready embeds in a dedicated worker with transient progre
   expect(maker).toContain('embedProgress.hidden = safeDone >= safeTotal;');
   expect(maker).not.toContain('Optimising compact embed…');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
-  expect(webEmbed).toContain('new Worker(new URL("embed-worker.js", import.meta.url)');
+  expect(webEmbed).toContain('const workerUrl = new URL("embed-worker.js", import.meta.url);');
+  expect(webEmbed).toContain('workerUrl.searchParams.set("v", __WEB_VERSION__);');
   expect(webEmbed).toContain('wait.progress?.(response.progress);');
   expect(webEmbed).toContain('getWorker().postMessage({ id, art, cfg, theme, surface });');
-  expect(worker).toContain('const data = await packEmbedSmall(request.art, request.cfg, progress =>');
-  expect(worker).toContain('self.postMessage({ id: request.id, progress } satisfies Response);');
+  expect(webEmbed).toContain('getWorker().postMessage({ id, raw, cfg, theme, surface }, [raw.buffer as ArrayBuffer]);');
+  expect(worker).toContain('packEmbedSmall');
+  expect(worker).toContain('packRawEmbedSmall');
+  expect(worker).toContain('self.postMessage({ id: request.id, progress: value } satisfies Response);');
   expect(worker).toContain('codec: embedCodec');
   expect(worker).toContain('src: __EMBED_SRC__');
   expect(worker).not.toContain("taggedText");

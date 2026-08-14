@@ -10,6 +10,8 @@ const api = join(site, "v1");
 const tplDir = join(root, "templates", "embed");
 const brotliWasm = join(root, "node_modules", "brotli-wasm", "pkg.web", "brotli_wasm_bg.wasm");
 const cdn = "https://kitty-crow.github.io/braille-art-maker/v1/embed.js";
+const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string };
+const webVersion = pkg.version;
 
 const makeClassic = async (path: string): Promise<void> => {
   const source = await readFile(path, "utf8");
@@ -24,15 +26,24 @@ const makeClassic = async (path: string): Promise<void> => {
   await writeFile(path, wrapped);
 };
 
+const versionWebEntry = async (): Promise<void> => {
+  const path = join(site, "index.html");
+  const source = await readFile(path, "utf8");
+  const marker = 'src="assets/app.js"';
+  if (!source.includes(marker)) throw new Error("Pages home does not contain the browser app entrypoint.");
+  await writeFile(path, source.replace(marker, `src="assets/app.js?v=${encodeURIComponent(webVersion)}"`));
+};
+
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 const pages = await loadPages(join(root, "pages.config.ts"));
 await buildPages(pages);
+await versionWebEntry();
 await mkdir(assets, { recursive: true });
 await mkdir(api, { recursive: true });
 
 const embedTpl = await readFile(join(tplDir, "embed.html"), "utf8");
-const define = { __EMBED_HTML__: JSON.stringify(embedTpl), __EMBED_SRC__: JSON.stringify(cdn) };
+const define = { __EMBED_HTML__: JSON.stringify(embedTpl), __EMBED_SRC__: JSON.stringify(cdn), __WEB_VERSION__: JSON.stringify(webVersion) };
 const lib = await Bun.build({ entrypoints: [join(root, "src", "index.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
 const cli = await Bun.build({ entrypoints: [join(root, "src", "cli.ts")], outdir: dist, target: "bun", format: "esm", sourcemap: "external", external: ["pngjs"], define });
 const web = await Bun.build({ entrypoints: [join(root, "src", "web.ts")], outdir: assets, target: "browser", format: "esm", naming: "app.js", minify: true, sourcemap: "none", define });

@@ -21,6 +21,7 @@ const css = (rgb: Rgb): string => `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
 const codecFromMarker = (marker: string): EmbedCodec | null => marker === "1" || marker === "2" || marker === "3" || marker === "4" ? `u${marker}` as EmbedCodec : null;
 const sameRgb = (a?: Rgb, b?: Rgb): boolean => (!a && !b) || (!!a && !!b && a.r === b.r && a.g === b.g && a.b === b.b);
 const pct = (index: number, columns: number): string => `${Number((index * 100 / columns).toFixed(6))}%`;
+const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));
 
 const gradient = (
   colours: readonly CellColour[] | undefined,
@@ -65,6 +66,8 @@ class View {
   private family: string | null = null;
   private compactAllowed = false;
   private generation = 0;
+  private paintGeneration = 0;
+  private painting = false;
 
   constructor(private readonly host: HTMLElement, private readonly opts: Opts) {
     this.root = host.shadowRoot ?? host.attachShadow({ mode: "open" });
@@ -83,6 +86,8 @@ class View {
 
   private async render(): Promise<void> {
     const generation = ++this.generation;
+    this.paintGeneration += 1;
+    this.painting = false;
     try {
       const payload = await this.readPayload();
       if (generation !== this.generation) return;
@@ -108,53 +113,104 @@ class View {
     }
   }
 
-  private renderCells(payload: PackedEmbed): void {
-    if (!this.grid) return;
+  private rowShells(payload: PackedEmbed): HTMLElement[] {
+    if (!this.grid) return [];
     const fragment = document.createDocumentFragment();
+    const rows: HTMLElement[] = [];
     for (let y = 0; y < payload.rows; y += 1) {
       const row = document.createElement("div");
       row.className = "row";
-      for (let x = 0; x < payload.columns; x += 1) {
-        const at = y * payload.columns + x;
-        const cell = document.createElement("span");
-        const colour = payload.cellColours?.[at];
-        cell.className = "cell";
-        cell.textContent = String.fromCodePoint(0x2800 + (payload.masks[at] ?? 0));
-        if (colour?.fg) cell.style.color = css(colour.fg);
-        if (colour?.bg) cell.style.backgroundColor = css(colour.bg);
-        row.append(cell);
-      }
+      rows.push(row);
       fragment.append(row);
     }
     this.grid.replaceChildren(fragment);
+    return rows;
+  }
+
+  private fillCellRow(row: HTMLElement, payload: PackedEmbed, y: number): void {
+    const fragment = document.createDocumentFragment();
+    for (let x = 0; x < payload.columns; x += 1) {
+      const at = y * payload.columns + x;
+      const cell = document.createElement("span");
+      const colour = payload.cellColours?.[at];
+      cell.className = "cell";
+      cell.textContent = String.fromCodePoint(0x2800 + (payload.masks[at] ?? 0));
+      if (colour?.fg) cell.style.color = css(colour.fg);
+      if (colour?.bg) cell.style.backgroundColor = css(colour.bg);
+      fragment.append(cell);
+    }
+    row.replaceChildren(fragment);
+  }
+
+  private fillCompactRow(row: HTMLElement, payload: PackedEmbed, y: number): void {
+    const offset = y * payload.columns;
+    const text = rowText(payload, y);
+    if (!payload.cellColours) {
+      row.textContent = text;
+      return;
+    }
+    const bg = gradient(payload.cellColours, offset, payload.columns, true, "transparent");
+    const fg = gradient(payload.cellColours, offset, payload.columns, false, "var(--surface-fg)");
+    if (bg) row.style.backgroundImage = bg;
+    const ink = document.createElement("span");
+    ink.className = fg ? "ink ink-colour" : "ink";
+    ink.textContent = text;
+    if (fg) ink.style.backgroundImage = fg;
+    row.replaceChildren(ink);
+  }
+
+  private renderCells(payload: PackedEmbed): void {
+    if (!this.grid) return;
+    const rows = this.rowShells(payload);
+    for (let y = 0; y < payload.rows; y += 1) this.fillCellRow(rows[y]!, payload, y);
     this.grid.dataset.unicodeRender = "cells";
     this.grid.style.removeProperty("font-family");
   }
 
   private renderRows(payload: PackedEmbed, fit: BrailleFontFit): void {
     if (!this.grid) return;
-    const fragment = document.createDocumentFragment();
-    for (let y = 0; y < payload.rows; y += 1) {
-      const offset = y * payload.columns;
-      const row = document.createElement("div");
-      row.className = "row";
-      const text = rowText(payload, y);
-      if (!payload.cellColours) row.textContent = text;
-      else {
-        const bg = gradient(payload.cellColours, offset, payload.columns, true, "transparent");
-        const fg = gradient(payload.cellColours, offset, payload.columns, false, "var(--surface-fg)");
-        if (bg) row.style.backgroundImage = bg;
-        const ink = document.createElement("span");
-        ink.className = fg ? "ink ink-colour" : "ink";
-        ink.textContent = text;
-        if (fg) ink.style.backgroundImage = fg;
-        row.append(ink);
-      }
-      fragment.append(row);
-    }
-    this.grid.replaceChildren(fragment);
+    const rows = this.rowShells(payload);
+    for (let y = 0; y < payload.rows; y += 1) this.fillCompactRow(rows[y]!, payload, y);
     this.grid.dataset.unicodeRender = "rows";
     this.grid.style.fontFamily = fit.family;
+  }
+
+  private async renderInterlaced(payload: PackedEmbed, fit: BrailleFontFit | null): Promise<void> {
+    if (!this.grid) return;
+    const paintGeneration = ++this.paintGeneration;
+    this.painting = true;
+    const rows = this.rowShells(payload);
+    const compact = fit !== null;
+    const batch = compact ? 12 : Math.max(1, Math.floor(2048 / payload.columns));
+    this.grid.dataset.unicodeRender = compact ? "rows" : "cells";
+    if (fit) this.grid.style.fontFamily = fit.family;
+    else this.grid.style.removeProperty("font-family");
+
+    try {
+      // Build the final target-resolution Unicode DOM progressively. Even rows establish
+      // image-wide detail first; odd rows then complete it. No lower-resolution rendering
+      // is computed and discarded.
+      for (const parity of [0, 1] as const) {
+        let sinceYield = 0;
+        for (let y = parity; y < payload.rows; y += 2) {
+          if (this.payload !== payload || paintGeneration !== this.paintGeneration) return;
+          const row = rows[y]!;
+          if (fit) this.fillCompactRow(row, payload, y);
+          else this.fillCellRow(row, payload, y);
+          sinceYield += 1;
+          if (sinceYield >= batch) {
+            sinceYield = 0;
+            await nextFrame();
+          }
+        }
+        await nextFrame();
+      }
+    } finally {
+      if (this.payload === payload && paintGeneration === this.paintGeneration) {
+        this.painting = false;
+        this.fit();
+      }
+    }
   }
 
   private scaffold(): DocumentFragment {
@@ -190,6 +246,8 @@ class View {
   }
 
   private fail(err: unknown): void {
+    this.paintGeneration += 1;
+    this.painting = false;
     const frame = document.createElement("div");
     frame.className = "frame";
     const dark = this.surfaceDark();
@@ -222,23 +280,39 @@ class View {
 
   private fit(): void {
     if (!this.payload || !this.frame || !this.grid) return;
+    const payload = this.payload;
     const width = this.frame.clientWidth || this.host.clientWidth;
     const height = this.frame.clientHeight || this.host.clientHeight || width;
-    const target = Math.max(0.5, Math.min(width / this.payload.columns, height / (this.payload.rows * 2)));
-    const fit = this.compactAllowed && this.payload.columns > compactAbove ? exactBrailleFont(this.grid, target) : null;
+    const target = Math.max(0.5, Math.min(width / payload.columns, height / (payload.rows * 2)));
+    const fit = this.compactAllowed && payload.columns > compactAbove ? exactBrailleFont(this.grid, target) : null;
     const mode: "cells" | "rows" = fit ? "rows" : "cells";
     const family = fit?.family ?? null;
-
-    if (this.mode !== mode || (mode === "rows" && this.family !== family) || this.grid.childNodes.length === 0) {
-      if (fit) this.renderRows(this.payload, fit);
-      else this.renderCells(this.payload);
-      this.mode = mode;
-      this.family = family;
-    }
+    const changed = this.mode !== mode || (mode === "rows" && this.family !== family) || this.grid.childNodes.length === 0;
 
     const font = fit?.fontPx ?? this.legacyFont(target);
     this.grid.style.fontSize = `${font}px`;
     this.grid.style.setProperty("--cell", `${target}px`);
+
+    if (this.painting) {
+      if (changed) {
+        this.paintGeneration += 1;
+        this.painting = false;
+        this.mode = mode;
+        this.family = family;
+        void this.renderInterlaced(payload, fit);
+      }
+      return;
+    }
+
+    if (!changed) return;
+    this.mode = mode;
+    this.family = family;
+    if (payload.columns > compactAbove) {
+      void this.renderInterlaced(payload, fit);
+      return;
+    }
+    if (fit) this.renderRows(payload, fit);
+    else this.renderCells(payload);
   }
 
   private theme(): EmbedTheme {

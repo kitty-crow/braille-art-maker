@@ -1,5 +1,5 @@
 import { embedCodec } from "../embed/codec.ts";
-import { packEmbedSmall } from "../embed/small-browser.ts";
+import { packEmbedSmall, packRawEmbedSmall } from "../embed/small-browser.ts";
 import { Tpl } from "../embed/tpl.ts";
 import type { EmbedSurface, EmbedTheme, EmbedTpl } from "../embed/types.ts";
 import type { PackProgress } from "../embed/ultra-search.ts";
@@ -7,7 +7,8 @@ import type { Art, ArtCfg } from "../types.ts";
 
 interface Request {
   readonly id: number;
-  readonly art: Art;
+  readonly art?: Art;
+  readonly raw?: Uint8Array;
   readonly cfg: ArtCfg;
   readonly theme: EmbedTheme;
   readonly surface: EmbedSurface;
@@ -27,9 +28,14 @@ self.addEventListener("message", event => {
   const request = event.data as Request;
   void (async () => {
     try {
-      const data = await packEmbedSmall(request.art, request.cfg, progress => {
-        self.postMessage({ id: request.id, progress } satisfies Response);
-      });
+      const progress = (value: PackProgress): void => {
+        self.postMessage({ id: request.id, progress: value } satisfies Response);
+      };
+      const data = request.raw
+        ? await packRawEmbedSmall(request.raw, progress)
+        : request.art
+          ? await packEmbedSmall(request.art, request.cfg, progress)
+          : (() => { throw new Error("Embed worker received no Unicode art."); })();
       const html = fill.make({
         data,
         codec: embedCodec,

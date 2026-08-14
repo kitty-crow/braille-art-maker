@@ -8,7 +8,7 @@ import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
 import { download } from "./download.ts";
 import { EmbedView } from "./embed-view.ts";
-import { embedHtml } from "./embed.ts";
+import { cancelEmbedHtml, embedHtml } from "./embed.ts";
 import { decodeImage } from "./image.ts";
 import { bindResolutionGate } from "./resolution.ts";
 import { bindTooltips } from "./tooltips.ts";
@@ -33,7 +33,7 @@ export const startMaker = (): void => {
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
-  let embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
+  let makerGeneration = 0, embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
   const makerCfg = (): ArtCfg => ({
@@ -91,12 +91,19 @@ export const startMaker = (): void => {
     embedProgress.hidden = safeDone >= safeTotal;
   };
 
-  const scheduleEmbed = (next: Art, cfg: ArtCfg): void => {
+  const resetEmbed = (): number => {
     const generation = ++embedGeneration;
     window.clearTimeout(embedTimer);
+    cancelEmbedHtml();
     embed = "";
     copyEmbed.disabled = true;
     embedCode.textContent = "Generating embed";
+    embedProgress.hidden = true;
+    return generation;
+  };
+
+  const scheduleEmbed = (next: Art, cfg: ArtCfg, generation: number): void => {
+    if (generation !== embedGeneration || art !== next) return;
     setEmbedProgress(0, 1);
     embedTimer = window.setTimeout(() => {
       void embedHtml(next, cfg, "auto", "auto", progress => {
@@ -119,19 +126,36 @@ export const startMaker = (): void => {
 
   const generateMaker = (): void => {
     if (!vector) return;
+    const source = vector;
     const cfg = makerCfg();
-    const next = makeArt(vector.pixels, cfg);
-    art = next;
-    renderDense(output, next);
-    scheduleEmbed(next, cfg);
-    metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${vector.paths} paths${next.cellColours ? " · colour" : ""}`;
-    setStatus("Ready");
+    const local = ++makerGeneration;
+    const embedLocal = resetEmbed();
+    const highResolution = (cfg.columns ?? 96) > 256;
+    setStatus(highResolution ? "Generating high-resolution art…" : "Rendering…", true);
+
+    void (async () => {
+      if (highResolution) await new Promise(requestAnimationFrame);
+      if (local !== makerGeneration || vector !== source) return;
+      const next = makeArt(source.pixels, cfg);
+      if (local !== makerGeneration || vector !== source) return;
+      art = next;
+      metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${source.paths} paths${next.cellColours ? " · colour" : ""}`;
+      await renderDense(output, next);
+      if (local !== makerGeneration || art !== next) return;
+      setStatus("Ready");
+      // High-resolution preview and embed encoding are intentionally sequential. This keeps
+      // the DOM build and Brotli/WASM peak allocations from competing for memory.
+      scheduleEmbed(next, cfg, embedLocal);
+    })().catch(error => {
+      if (local !== makerGeneration) return;
+      setStatus(error instanceof Error ? error.message : "Rendering failed.");
+    });
   };
 
   const generateHero = (): void => {
     if (!heroPixels) return;
     const next = makeArt(heroPixels, heroCfg());
-    renderDense(heroUnicode, next);
+    void renderDense(heroUnicode, next);
   };
 
   const applyThemeDefaults = (theme: Theme): void => {
