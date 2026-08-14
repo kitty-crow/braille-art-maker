@@ -34,19 +34,32 @@
 }
 
 .row {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), var(--cell));
-  width: calc(var(--cols) * var(--cell));
-  height: calc(var(--cell) * 2);
-}
-
-.cell {
   display: block;
-  width: var(--cell);
+  width: calc(var(--cols) * var(--cell));
   height: calc(var(--cell) * 2);
   line-height: calc(var(--cell) * 2);
   white-space: pre;
   overflow: visible;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.ink {
+  display: block;
+  width: 100%;
+  height: 100%;
+  line-height: calc(var(--cell) * 2);
+  white-space: pre;
+  overflow: visible;
+}
+
+.ink-colour {
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 .probe {
