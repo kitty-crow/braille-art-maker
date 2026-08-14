@@ -1,12 +1,13 @@
 # API
 
-`vectorStage(pixels, options)` runs the pinned Vectoriser and returns its SVG plus reconstructed RGBA pixels.
+`makeArt(pixels, cfg)` returns Unicode Braille plus optional per-cell foreground/background colours.
 
-`makeArt(pixels, options)` converts RGBA pixels to Unicode Braille.
+Colour fields in `ArtCfg`:
 
 ```ts
-const vector = vectorStage({ width, height, data: rgba });
-const art = makeArt(vector.pixels, { columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "atkinson" });
+colour?: boolean
+colourBackground?: boolean
+fullColour?: boolean
 ```
 
-`pixels.data` contains one 8-bit RGBA value per channel.
+`taggedText(art)` serialises colour cells as `<#rrggbb>` / `<@#rrggbb>` tags. `taggedToAnsi(text)` converts the tag format to terminal truecolour escapes. `denseHtml(art)` emits self-contained coloured HTML.
