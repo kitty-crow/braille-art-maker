@@ -3,13 +3,12 @@
 ```bash
 bun run cli -- image.png
 bun run cli -- image.png --colour -o image.txt
-bun run cli -- image.png --colour-background -o image.txt
 bun run cli -- image.png --full-colour --html -o image.html
 bun run cli -- image.png --full-colour --ansi
 bun run cli -- image.png --colour --embed -o image-embed.html
 ```
 
-`--full-colour` implies foreground and background colour. `--colour-background` implies colour. Ordered 4x4 dithering and inverted polarity are the core CLI defaults.
+`--colour` is foreground-only colour. `--full-colour` implies foreground and background colour and enables the adaptive two-colour cell representation. The older `--colour-background` flag remains accepted for backwards compatibility but is no longer a recommended colour mode. Ordered 4x4 dithering and inverted polarity are the core CLI defaults.
 
 Embedding options:
 
