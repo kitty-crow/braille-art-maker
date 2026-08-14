@@ -1,17 +1,8 @@
 export type EmbedTheme = "auto" | "light" | "dark";
 export type EmbedSurface = "auto" | "light" | "dark";
 
-export interface EmbedPayload {
-  readonly text: string;
-  readonly columns: number;
-  readonly rows: number;
-  readonly colour: boolean;
-  readonly colourBackground: boolean;
-  readonly fullColour: boolean;
-}
-
 export interface EmbedCfg {
-  readonly payload: EmbedPayload;
+  readonly data: string;
   readonly theme: EmbedTheme;
   readonly surface: EmbedSurface;
   readonly src: string;

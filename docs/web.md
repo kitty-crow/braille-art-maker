@@ -8,6 +8,8 @@ When the page is light and the maker is showing foreground-only colour, the prev
 
 Paste-ready embeds use the same safety rule: with `data-surface="auto"`, foreground-only colour on a resolved light theme receives the dark surface. Background/full-colour output follows the normal theme surface. The consuming site may explicitly set `data-surface="light"` if it accepts the readability trade-off.
 
+The embed fragment contains compact `u1` binary data rather than literal Unicode/tagged TXT. The maker displays that fragment as a sanitised, syntax-highlighted HTML block using Marked, DOMPurify and Highlight.js.
+
 Theme changes re-apply the light/dark defaults for hero background colour and maker polarity. The controls remain manually adjustable afterward.
 
 Each range control has an accessible SVG info button. Pointer hover follows the cursor with a tooltip; keyboard focus shows the same explanation beside the button.

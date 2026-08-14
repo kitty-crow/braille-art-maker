@@ -71,16 +71,31 @@ test("maker keeps slider defaults and switches only dither when colour is enable
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
 });
 
-test("maker exposes a paste-ready embed div", async () => {
+test("maker exposes a packed paste-ready embed div", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const webEmbed = await readFile(join(root, "src", "web", "embed.ts"), "utf8");
   expect(html).toContain('id="copy-embed"');
-  expect(html).toContain('id="embed-code" class="language-html"');
+  expect(html).toContain('id="embed-code" class="embed-code-view"');
   expect(maker).toContain('embed = embedHtml(next, cfg)');
+  expect(maker).toContain('embedView.render(embed)');
   expect(maker).toContain('navigator.clipboard.writeText(embed)');
+  expect(webEmbed).toContain('data: packEmbed(art, cfg)');
   expect(webEmbed).toContain('src: __EMBED_SRC__');
-  expect(webEmbed).toContain('text: art.cellColours ? taggedText(art) : art.text');
+  expect(webEmbed).not.toContain("taggedText");
+});
+
+test("embed code is rendered through Marked, DOMPurify and Highlight.js", async () => {
+  const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
+  const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
+  expect(view).toContain("marked@18.0.7");
+  expect(view).toContain("dompurify@3.4.12");
+  expect(view).toContain("@highlightjs/cdn-assets@11.11.1");
+  expect(view).toContain("api.purify.sanitize");
+  expect(view).toContain("api.highlight.highlightElement");
+  expect(css).toContain(".hljs-tag");
+  expect(css).toContain(".hljs-string");
+  expect(css).toContain("var(--code-attr)");
 });
 
 test("range controls have pointer-following accessible info tooltips", async () => {
@@ -114,7 +129,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.4");
+  expect(pkg.version).toBe("0.4.5");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });

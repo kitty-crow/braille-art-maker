@@ -5,7 +5,7 @@ const STYLE = "display:block;width:min(100%,40rem);aspect-ratio:1";
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
     return this.fill(tpl.html, {
-      DATA: this.data(cfg),
+      DATA: this.data(cfg.data),
       THEME: cfg.theme,
       SURFACE: cfg.surface,
       STYLE: this.attr(cfg.style ?? STYLE),
@@ -16,11 +16,9 @@ export class Tpl {
     });
   }
 
-  private data(cfg: EmbedCfg): string {
-    return JSON.stringify(cfg.payload)
-      .replaceAll("<", "\\u003c")
-      .replaceAll(">", "\\u003e")
-      .replaceAll("&", "\\u0026");
+  private data(value: string): string {
+    if (!value || !/^[A-Za-z0-9_-]+$/u.test(value)) throw new Error("Embed payload must be base64url data.");
+    return value;
   }
 
   private peer(src: string, name: string): string {

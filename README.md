@@ -26,6 +26,8 @@ The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1
 
 The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Foreground-only colour uses the dark preview surface in light mode so the result remains visible; the adjacent `?` explains that a genuinely light surface can make some colours difficult to see.
 
+The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer.
+
 Colour modes:
 
 - foreground colour follows the normal Unicode mask
@@ -65,7 +67,11 @@ Useful options:
 
 ## Embedding
 
-The maker's **Copy embed div** output carries the generated Unicode result itself, so the original PNG does not need to be uploaded or hosted. The small inline loader fetches the versioned runtime and stylesheet from GitHub Pages, mounts into Shadow DOM and keeps the consuming site's CSS isolated from the art.
+The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. The art is not embedded as literal Unicode/tagged TXT: each Unicode cell is packed to its 8-bit dot mask, repeated masks are run-length encoded, colour state changes are compacted, and the binary payload is stored as safe base64url using the versioned `u1` codec. The CDN runtime contains the matching decoder.
+
+Literal base256/base512 text encodings are intentionally not used because their non-ASCII code points take multiple bytes in UTF-8 HTML and make the fragment larger rather than smaller.
+
+The small loader fetches the versioned runtime and stylesheet from GitHub Pages, mounts into Shadow DOM and keeps the consuming site's CSS isolated from the art.
 
 Published assets:
 
@@ -89,7 +95,7 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror extras/term/unicode-colour-view.c -
 ## API
 
 ```ts
-import { makeArt, taggedText, vectorStage } from "@kitty-crow/unicode-art-maker";
+import { makeArt, packEmbed, unpackEmbed, taggedText, vectorStage } from "@kitty-crow/unicode-art-maker";
 ```
 
 ## Project layout
@@ -99,7 +105,7 @@ src/core/        Unicode signal, tone, dithering and packing
 src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
-src/embed/       embed generator and browser runtime
+src/embed/       packed embed codec, generator and browser runtime
 src/web/         browser behaviour
 src/cli/         CLI parsing and output
 templates/embed/ paste-ready embed host, CSS and loader

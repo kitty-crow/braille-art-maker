@@ -8,6 +8,7 @@ import { bindCompare } from "./compare.ts";
 import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
 import { download } from "./download.ts";
+import { EmbedView } from "./embed-view.ts";
 import { embedHtml } from "./embed.ts";
 import { decodeImage } from "./image.ts";
 import { bindTooltips } from "./tooltips.ts";
@@ -27,6 +28,7 @@ export const startMaker = (): void => {
   const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), columnsOut = qs<HTMLOutputElement>("#columns-out"), embedCode = qs<HTMLElement>("#embed-code");
+  const embedView = new EmbedView(embedCode);
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
@@ -65,7 +67,7 @@ export const startMaker = (): void => {
     const next = makeArt(vector.pixels, cfg);
     art = next;
     embed = embedHtml(next, cfg);
-    embedCode.textContent = embed;
+    embedView.render(embed);
     copyEmbed.disabled = false;
     renderDense(output, next);
     metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${vector.paths} paths${next.cellColours ? " · colour" : ""}`;

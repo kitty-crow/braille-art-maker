@@ -8,13 +8,31 @@ https://kitty-crow.github.io/braille-art-maker/v1/embed.css
 https://kitty-crow.github.io/braille-art-maker/v1/load.js
 ```
 
-The embed carries the already-generated Unicode result, including colour tags, so an uploaded PNG does not need to be hosted or sent anywhere after conversion.
+The embed carries the already-generated result, so an uploaded PNG does not need to be hosted or sent anywhere after conversion.
+
+## Packed payload
+
+Embeds use the versioned `u1` codec rather than literal Unicode/tagged TXT.
+
+The encoder:
+
+- maps every Unicode cell back to its single 8-bit dot mask
+- run-length encodes repeated masks without expanding high-entropy regions
+- stores foreground/background colour changes as compact state streams
+- stores dimensions and colour-mode flags in the binary header
+- serialises the binary as base64url, whose alphabet is safe inside the embed's data script
+
+The matching decoder lives in `src/embed/codec.ts`, is exported as `unpackEmbed`, and is bundled into `/v1/embed.js`.
+
+Base256/base512 Unicode encodings are not used because non-ASCII code points take two or more bytes in UTF-8 HTML. They therefore expand the binary payload despite using fewer visible characters. The binary pack plus base64url is smaller in actual transferred HTML.
 
 ## Browser
 
-The maker shows a paste-ready embed div and provides **Copy embed div**. The fragment contains:
+The maker shows a paste-ready embed div and provides **Copy embed div**. The visible code block is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
-- generated Unicode text and dimensions as JSON data
+The fragment contains:
+
+- one compact `u1` payload
 - theme and surface settings
 - an internal Shadow DOM template
 - links to the versioned stylesheet, loader and bundled API

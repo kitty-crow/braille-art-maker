@@ -1,4 +1,4 @@
-import { taggedText } from "../colour/tagged.ts";
+import { packEmbed } from "../embed/codec.ts";
 import { Tpl } from "../embed/tpl.ts";
 import type { EmbedSurface, EmbedTheme, EmbedTpl } from "../embed/types.ts";
 import type { Art, ArtCfg } from "../types.ts";
@@ -12,14 +12,7 @@ export const embedHtml = (
   theme: EmbedTheme = "auto",
   surface: EmbedSurface = "auto",
 ): string => fill.make({
-  payload: {
-    text: art.cellColours ? taggedText(art) : art.text,
-    columns: art.columns,
-    rows: art.rows,
-    colour: cfg.colour === true,
-    colourBackground: cfg.colourBackground === true,
-    fullColour: cfg.fullColour === true,
-  },
+  data: packEmbed(art, cfg),
   theme,
   surface,
   src: __EMBED_SRC__,
