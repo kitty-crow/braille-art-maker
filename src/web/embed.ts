@@ -70,6 +70,7 @@ export const embedHtml = (
   theme: EmbedTheme = "auto",
   surface: EmbedSurface = "auto",
   progress?: (value: PackProgress) => void,
+  preparedRaw?: Uint8Array,
 ): Promise<string> => new Promise((resolve, reject) => {
   // Only the newest generated art matters in the maker. Killing stale work also releases
   // any large Brotli/WASM allocation before a new high-resolution encode begins.
@@ -80,11 +81,10 @@ export const embedHtml = (
   pending.set(id, { resolve, reject, ...(progress ? { progress } : {}), oneShot });
 
   if (oneShot) {
-    // Do not structured-clone the potentially enormous Art/cellColours graph. Build one
-    // exact raw payload on the page, then transfer its ArrayBuffer to the Worker with
-    // ownership transfer. The Worker only performs transport compression and is disposed
-    // after this job so its high-water WASM memory is released.
-    const raw = packBoundedRaw(art, cfg);
+    // Do not structured-clone the potentially enormous Art/cellColours graph. Reuse a
+    // cache-prepared exact raw payload when available, otherwise build it once here, then
+    // transfer ownership of the ArrayBuffer to the one-shot Worker.
+    const raw = preparedRaw ?? packBoundedRaw(art, cfg);
     getWorker().postMessage({ id, raw, cfg, theme, surface }, [raw.buffer as ArrayBuffer]);
     return;
   }
