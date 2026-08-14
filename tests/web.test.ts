@@ -80,10 +80,28 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker keeps slider defaults and supports 256 horizontal cells", async () => {
+test("maker gates the experimental 257-1024 range behind a 256 resistance notch", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(html).toContain('id="columns" type="range" min="24" max="256" step="1" value="96"');
+  const gate = await readFile(join(root, "src", "web", "resolution.ts"), "utf8");
+  const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
+  expect(html).toContain('id="columns" type="range" min="24" max="1024" step="1" value="96"');
+  expect(html).toContain('class="resolution-notch"');
+  expect(html).toContain('id="resolution-tip" class="slider-tip resolution-tip"');
+  expect(html).toContain('Resolutions above 256 cells are experimental.');
+  expect(maker).toContain('bindResolutionGate(columns, columnsOut, resolutionTip, schedule);');
+  expect(gate).toContain('const notch = opts.notch ?? 256;');
+  expect(gate).toContain('const resistance = opts.resistancePx ?? 34;');
+  expect(gate).toContain('requested > notch');
+  expect(gate).toContain('event.clientX < notchX() + resistance');
+  expect(gate).toContain('Keep dragging to continue.');
+  expect(css).toContain('.resolution-notch');
+  expect(css).toContain('left:23.2%');
+});
+
+test("maker keeps the non-resolution slider and colour defaults", async () => {
+  const html = await readFile(join(root, "web", "index.html"), "utf8");
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   expect(html).toContain('id="contrast" type="range" min="0.55" max="1.9" step="0.01" value="1.12"');
   expect(html).toContain('id="detail" type="range" min="0" max="1.2" step="0.01" value="0.34"');
   expect(html).toContain('id="bias" type="range" min="-0.25" max="0.25" step="0.005" value="0.015"');
