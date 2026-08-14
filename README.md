@@ -86,13 +86,13 @@ The maker's **Copy embed div** output carries the generated result itself, so th
 
 Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
 
-For each binary candidate, `u4` now compares the established safe ASCII basE91 transport with an experimental **CJK-4096** transport. CJK-4096 maps 12 bits to one BMP CJK Unified Ideograph from U+4E00 through U+5DFF and uses a tiny explicit marker for compression mode and tail length. The optimiser deliberately chooses the shortest **character count**, because this experiment targets copied/source payload length. For non-trivial payloads the CJK form is typically about **54% of the basE91 character count** (roughly 46% shorter), although its UTF-8 byte size is larger because each CJK character occupies three bytes.
+For each binary candidate, `u4` now compares the established safe ASCII basE91 transport with **J8192**, a 13-bit Japanese-oriented alphabet of exactly 8,192 normalisation-stable BMP characters built from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. The optimiser deliberately chooses the shortest **character count**, because this transport targets copied/source payload length. For substantial payloads J8192 is roughly **half the basE91 character count**, although its UTF-8 byte size is larger because the Japanese characters occupy multiple UTF-8 bytes.
 
-The CJK encoder/decoder is simple linear bit packing; Brotli remains the expensive part of embed generation. Old basE91 `u4` payloads remain fully decodable, and arbitrary Unicode is still rejected by the embed template validator. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
+The J8192 encoder/decoder is simple linear bit packing. Brotli remains the expensive part of embed generation. Existing CJK-4096 `u4` payloads from 0.4.28 and older basE91 `u4` payloads remain fully decodable, and arbitrary Unicode is still rejected by the embed template validator. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
 
 New copied embeds contain only the readable outer host attributes, one self-identifying single-line payload script and one loader script. The repeated Shadow DOM template, stylesheet link and API URL are no longer copied into every fragment: `embed.js` reconstructs the internal scaffold and stylesheet, while `load.js` derives the API URL from its own URL. The decoder remains part of this repository and is bundled into the published runtime.
 
-The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2`, `u3` and previous basE91 `u4` payloads.
+The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2`, `u3`, previous basE91 `u4` payloads and the 0.4.28 CJK-4096 `u4` transport.
 
 Published assets:
 

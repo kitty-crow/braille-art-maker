@@ -1,12 +1,14 @@
 import { base85Alphabet } from "./base85.ts";
 import { base91Alphabet } from "./base91.ts";
 import { cjk4096Range } from "./cjk4096.ts";
+import { j8192Alphabet } from "./j8192.ts";
 import type { EmbedCodec } from "./codec.ts";
 import type { EmbedCfg, EmbedTpl } from "./types.ts";
 
 const STYLE = "display:block;width:min(100%,40rem);aspect-ratio:1";
 const base85 = new Set(base85Alphabet);
 const base91 = new Set(base91Alphabet);
+const j8192 = new Set(j8192Alphabet);
 const cjk4096 = (value: string): boolean => [...value].every(char => {
   const code = char.charCodeAt(0);
   return code >= cjk4096Range.first && code <= cjk4096Range.last;
@@ -35,6 +37,11 @@ export class Tpl {
       return value;
     }
     if (codec === "u4") {
+      if (/^&[JKL][0-9ABC]/u.test(value)) {
+        const body = value.slice(3);
+        if (!body || [...body].some(char => !j8192.has(char))) throw new Error("Embed payload contains unsafe J8192 data.");
+        return value;
+      }
       if (/^&[RDB][012]/u.test(value)) {
         const body = value.slice(3);
         if (!body || !cjk4096(body)) throw new Error("Embed payload contains unsafe CJK-4096 data.");

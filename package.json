@@ -1,6 +1,6 @@
 {
   "name": "@kitty-crow/unicode-art-maker",
-  "version": "0.4.28",
+  "version": "0.4.29",
   "description": "PNG to dense Unicode art for Bun and the browser.",
   "type": "module",
   "license": "MIT",
@@ -15,7 +15,7 @@
     "pages:check": "bun vendor/pages/src/cli.ts check pages.config.ts",
     "check:c": "cc -std=c11 -Wall -Wextra -Wpedantic -Werror extras/term/unicode-colour-view.c -o /tmp/unicode-colour-view",
     "check": "bun run version:check && bun run pages:check && bunx tsc --noEmit && bun run check:c && bun run test",
-    "test": "bun test tests/core.test.ts tests/colour.test.ts tests/vector.test.ts tests/embed.test.ts tests/cjk4096.test.ts tests/ultra.test.ts tests/tpl.test.ts tests/web.test.ts tests/web-controls.test.ts tests/build.test.ts tests/fidelity.test.ts",
+    "test": "bun test tests/core.test.ts tests/colour.test.ts tests/vector.test.ts tests/embed.test.ts tests/cjk4096.test.ts tests/j8192.test.ts tests/ultra.test.ts tests/tpl.test.ts tests/web.test.ts tests/web-controls.test.ts tests/build.test.ts tests/fidelity.test.ts",
     "build": "bun src/build.ts",
     "site:build": "bun src/build.ts",
     "site:dev": "bun src/build.ts && bun src/serve.ts",

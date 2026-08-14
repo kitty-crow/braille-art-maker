@@ -1,6 +1,6 @@
 import { deflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { encodeU4, encodeU4Cjk } from "./codec.ts";
+import { encodeU4, encodeU4J } from "./codec.ts";
 import { packRawV2Candidates } from "./raw.ts";
 import { packUltraCandidates } from "./ultra-raw.ts";
 
@@ -18,7 +18,7 @@ const deflate = (bytes: Uint8Array): Uint8Array => deflateSync(bytes, { level: 9
 
 const transports = (mode: "r" | "d" | "b", bytes: Uint8Array): readonly string[] => [
   encodeU4(mode, bytes),
-  encodeU4Cjk(mode, bytes),
+  encodeU4J(mode, bytes),
 ];
 
 const packBounded = (art: Art, cfg: ArtCfg, brotli: BrotliFn, progress?: PackProgressFn): string => {
