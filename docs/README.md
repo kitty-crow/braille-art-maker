@@ -2,6 +2,7 @@
 
 This directory documents the Braille Art Maker design and public contract while the implementation is being restored from the repository bootstrap mistake noted in the root README.
 
+- [Repository repair status](status.md): what is actually present on `main` right now.
 - [Architecture](architecture.md): module boundaries, data flow and runtime split.
 - [Conversion algorithm](algorithm.md): vectorisation, tone mapping, dithering and Unicode packing.
 - [Browser and hero](web.md): dense rendering, controls and the vertical 50/50 comparison slider.
