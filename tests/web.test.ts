@@ -80,10 +80,10 @@ test("maker polarity follows the selected canvas when canvas or mode changes", a
   expect(maker).toContain('syncColour(true); schedule();');
 });
 
-test("maker keeps slider defaults and supports 256 horizontal cells", async () => {
+test("maker keeps slider defaults and supports 1024 horizontal cells experimentally", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(html).toContain('id="columns" type="range" min="24" max="256" step="1" value="96"');
+  expect(html).toContain('id="columns" type="range" min="24" max="1024" step="1" value="96"');
   expect(html).toContain('id="contrast" type="range" min="0.55" max="1.9" step="0.01" value="1.12"');
   expect(html).toContain('id="detail" type="range" min="0" max="1.2" step="0.01" value="0.34"');
   expect(html).toContain('id="bias" type="range" min="-0.25" max="0.25" step="0.005" value="0.015"');
@@ -92,6 +92,26 @@ test("maker keeps slider defaults and supports 256 horizontal cells", async () =
   expect(html).toContain('id="full-colour" type="checkbox" disabled>');
   expect(maker).toContain('dither.value = colour.checked ? "atkinson" : "ordered"');
   expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
+});
+
+test("high-resolution compact rows are allowed only after Braille metric verification", async () => {
+  const dense = await readFile(join(root, "src", "web", "dense.ts"), "utf8");
+  const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
+  const css = await readFile(join(root, "web", "styles", "unicode.css"), "utf8");
+  const embedCss = await readFile(join(root, "templates", "embed", "embed.css"), "utf8");
+  for (const source of [dense, runtime]) {
+    expect(source).toContain("const compactThreshold = 256;");
+    expect(source).toContain("const brailleProbe = Array.from({ length: 256 }");
+    expect(source).toContain("spread100 <= metricTolerance");
+    expect(source).toContain('compact ? "rows" : "cells"');
+    expect(source).toContain('"Segoe UI Symbol", monospace');
+  }
+  expect(dense).toContain('cell.className = "unicode-cell"');
+  expect(runtime).toContain('cell.className = "cell"');
+  expect(css).toContain('[data-unicode-render="cells"] .unicode-row');
+  expect(css).toContain('[data-unicode-render="rows"] .unicode-row');
+  expect(embedCss).toContain('[data-unicode-render="cells"] .row');
+  expect(embedCss).toContain('[data-unicode-render="rows"] .row');
 });
 
 test("maker packs paste-ready embeds in a dedicated worker with visible progress", async () => {
