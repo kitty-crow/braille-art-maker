@@ -5,6 +5,9 @@ export interface ArtSize {
 }
 
 export const minColumns = 8;
+// Backwards-compatible advisory ceiling: this is the browser slider maximum,
+// not a hard engine limit. artSize()/makeArt() intentionally accept larger values.
+export const maxColumns = 2048;
 
 export const artSize = (width: number, height: number, columns = 96): ArtSize => {
   const cols = Math.max(minColumns, Math.round(columns));
