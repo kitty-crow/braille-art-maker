@@ -20,12 +20,20 @@ export const bindResolutionGate = (
   onCommit: () => void,
   opts: ResolutionGateOpts = {},
 ): void => {
+  const notch = opts.notch ?? 256;
   const defaultResistance = opts.resistancePx ?? 34;
-  const gates = [...(opts.gates ?? [{
-    value: opts.notch ?? 256,
-    resistancePx: defaultResistance,
-    message: opts.message ?? "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue.",
-  }])].sort((a, b) => a.value - b.value);
+  const gates = [...(opts.gates ?? [
+    {
+      value: notch,
+      resistancePx: defaultResistance,
+      message: opts.message ?? "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue.",
+    },
+    {
+      value: 765,
+      resistancePx: defaultResistance,
+      message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself.",
+    },
+  ])].sort((a, b) => a.value - b.value);
   const min = Number(input.min);
   const max = Number(input.max);
   let pointer: number | null = null;
@@ -57,9 +65,8 @@ export const bindResolutionGate = (
   };
 
   const normalise = (value: number): number => Math.round(clamp(value, min, max));
+  const notchX = (): number => active?.x ?? pointerX;
 
-  // Resolution movement is intentionally cheap: keep the range and numerical control in
-  // sync, but do not regenerate the art until the user finishes the interaction.
   const setValue = (value: number): boolean => {
     const next = String(normalise(value));
     const changed = input.value !== next;
@@ -134,7 +141,7 @@ export const bindResolutionGate = (
       }
 
       const resistance = active.gate.resistancePx ?? defaultResistance;
-      if (event.clientX < active.x + resistance) {
+      if (event.clientX < notchX() + resistance) {
         setValue(active.gate.value);
         showTip(active.gate.message);
         return;
@@ -162,9 +169,6 @@ export const bindResolutionGate = (
     valueInput.value = input.value;
   });
 
-  // Range inputs emit change when the interaction is committed (pointer release / keyboard
-  // adjustment). Pointer finish below is retained as a fallback for engines with odd range
-  // event ordering; the committed-value guard prevents duplicate regeneration.
   input.addEventListener("change", commit);
 
   valueInput.addEventListener("input", () => {
