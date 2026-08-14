@@ -10,7 +10,7 @@ export const bindResolutionGate = (
   input: HTMLInputElement,
   valueInput: HTMLInputElement,
   tip: HTMLElement,
-  onInput: () => void,
+  onCommit: () => void,
   opts: ResolutionGateOpts = {},
 ): void => {
   const notch = opts.notch ?? 256;
@@ -23,6 +23,7 @@ export const bindResolutionGate = (
   let gateX: number | null = null;
   let pointerX = 0;
   let pointerY = 0;
+  let committed = Number(input.value);
 
   const placeTip = (x: number, y: number): void => {
     const pad = 12;
@@ -48,13 +49,21 @@ export const bindResolutionGate = (
   const notchX = (): number => gateX ?? pointerX;
   const normalise = (value: number): number => Math.round(clamp(value, min, max));
 
+  // Resolution movement is intentionally cheap: keep the range and numerical control in
+  // sync, but do not regenerate the art until the user finishes the interaction.
   const setValue = (value: number): boolean => {
     const next = String(normalise(value));
     const changed = input.value !== next;
     input.value = next;
     valueInput.value = next;
-    if (changed) onInput();
     return changed;
+  };
+
+  const commit = (): void => {
+    const next = Number(input.value);
+    if (next === committed) return;
+    committed = next;
+    onCommit();
   };
 
   const commitManual = (): void => {
@@ -64,12 +73,17 @@ export const bindResolutionGate = (
     released = next > notch;
     gateX = null;
     hideTip();
+    commit();
   };
+
+  input.addEventListener("focus", () => { committed = Number(input.value); });
+  valueInput.addEventListener("focus", () => { committed = Number(input.value); });
 
   input.addEventListener("pointerdown", event => {
     pointer = event.pointerId;
     pointerX = event.clientX;
     pointerY = event.clientY;
+    committed = Number(input.value);
     released = Number(input.value) > notch;
     gateX = null;
   });
@@ -112,12 +126,15 @@ export const bindResolutionGate = (
       input.value = String(notch);
       valueInput.value = input.value;
       showTip();
-      onInput();
       return;
     }
     valueInput.value = input.value;
-    onInput();
   });
+
+  // Range inputs emit change when the interaction is committed (pointer release / keyboard
+  // adjustment). Pointer finish below is retained as a fallback for engines with odd range
+  // event ordering; the committed-value guard prevents duplicate regeneration.
+  input.addEventListener("change", commit);
 
   valueInput.addEventListener("input", () => {
     if (!valueInput.value.trim()) return;
@@ -128,7 +145,6 @@ export const bindResolutionGate = (
     released = next > notch;
     gateX = null;
     hideTip();
-    onInput();
   });
   valueInput.addEventListener("change", commitManual);
   valueInput.addEventListener("blur", commitManual);
@@ -144,6 +160,7 @@ export const bindResolutionGate = (
     released = Number(input.value) > notch;
     gateX = null;
     hideTip();
+    commit();
   };
   input.addEventListener("pointerup", finish);
   input.addEventListener("pointercancel", finish);
