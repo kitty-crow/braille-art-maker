@@ -1,11 +1,16 @@
 import { base85Alphabet } from "./base85.ts";
 import { base91Alphabet } from "./base91.ts";
+import { cjk4096Range } from "./cjk4096.ts";
 import type { EmbedCodec } from "./codec.ts";
 import type { EmbedCfg, EmbedTpl } from "./types.ts";
 
 const STYLE = "display:block;width:min(100%,40rem);aspect-ratio:1";
 const base85 = new Set(base85Alphabet);
 const base91 = new Set(base91Alphabet);
+const cjk4096 = (value: string): boolean => [...value].every(char => {
+  const code = char.charCodeAt(0);
+  return code >= cjk4096Range.first && code <= cjk4096Range.last;
+});
 
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
@@ -30,6 +35,11 @@ export class Tpl {
       return value;
     }
     if (codec === "u4") {
+      if (/^&[RDB][012]/u.test(value)) {
+        const body = value.slice(3);
+        if (!body || !cjk4096(body)) throw new Error("Embed payload contains unsafe CJK-4096 data.");
+        return value;
+      }
       const body = value.startsWith("&r") || value.startsWith("&d") ? value.slice(2) : value;
       if (!body || [...body].some(char => !base91.has(char))) throw new Error("Embed payload contains unsafe base91 data.");
       return value;
