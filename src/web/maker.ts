@@ -143,8 +143,6 @@ export const startMaker = (): void => {
       await renderDense(output, next);
       if (local !== makerGeneration || art !== next) return;
       setStatus("Ready");
-      // High-resolution preview and embed encoding are intentionally sequential. This keeps
-      // the DOM build and Brotli/WASM peak allocations from competing for memory.
       scheduleEmbed(next, cfg, embedLocal);
     })().catch(error => {
       if (local !== makerGeneration) return;
@@ -192,7 +190,10 @@ export const startMaker = (): void => {
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
-  bindResolutionGate(columns, columnsValue, resolutionTip, schedule);
+  bindResolutionGate(columns, columnsValue, resolutionTip, schedule, { gates: [
+    { value: 256, resistancePx: 34, message: "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue." },
+    { value: 765, resistancePx: 34, message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself." },
+  ] });
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
