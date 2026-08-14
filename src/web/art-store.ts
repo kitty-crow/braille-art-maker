@@ -118,11 +118,8 @@ export const storeCachedArt = async (
   paths: number,
   rectangles: number,
   art: Art,
-  raw: Uint8Array,
+  payload: Blob,
 ): Promise<void> => {
-  // Blob snapshots the compact bytes before a high-resolution worker is allowed to take
-  // ownership of raw.buffer. IndexedDB therefore never structured-clones the live Art tree.
-  const payload = new Blob([raw], { type: "application/x-unicode-art" });
   const record: SessionRecord = {
     version,
     id,
