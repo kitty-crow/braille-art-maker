@@ -33,27 +33,37 @@ test("compact rows require exact geometry for all 256 Braille glyphs", async () 
   expect(probe).toContain("span.style.letterSpacing = \"0\";");
 });
 
-test("maker high-resolution rendering is asynchronous, interlaced and accumulates the final DOM", async () => {
+test("maker high-resolution rendering is cooperative, interlaced and never artificially frame-throttled", async () => {
   const dense = await read("src/web/dense.ts");
-  expect(dense).toContain("const nextFrame = (): Promise<void> => new Promise(resolve => requestAnimationFrame(() => resolve()));");
+  expect(dense).toContain("const paintBudgetMs = 12;");
   expect(dense).toContain("for (const parity of [0, 1] as const)");
   expect(dense).toContain("for (let y = parity; y < current.source.rows; y += 2)");
-  expect(dense).toContain("await nextFrame();");
+  expect(dense).toContain("performance.now() - sliceStart >= paintBudgetMs");
+  expect(dense).toContain("await yieldBrowser();");
+  expect(dense).toContain("scheduler?.yield");
+  expect(dense).toContain("taskChannel.port2.postMessage(0)");
+  expect(dense).not.toContain("await nextFrame();");
+  expect(dense).not.toContain("requestAnimationFrame(() => resolve())");
+  expect(dense).not.toContain("const batch =");
   expect(dense).toContain("rowShells(host, current.source.rows)");
   expect(dense).toContain("fillCompactRow(row, current.source, y, defaultFg)");
   expect(dense).toContain("fillCellRow(row, current.source, y)");
   expect(dense).not.toContain("makeArt(");
 });
 
-test("embed runtime has the same proof gate and progressive exact rendering fallback", async () => {
+test("embed runtime has the same proof gate and unthrottled progressive exact rendering fallback", async () => {
   const runtime = await read("src/embed/runtime.ts");
   const css = await read("templates/embed/embed.css");
   expect(runtime).toContain("const compactAbove = 256;");
+  expect(runtime).toContain("const paintBudgetMs = 12;");
   expect(runtime).toContain("this.compactAllowed = legacy === null;");
   expect(runtime).toContain("this.compactAllowed && payload.columns > compactAbove ? exactBrailleFont(this.grid, target) : null");
   expect(runtime).toContain("for (const parity of [0, 1] as const)");
   expect(runtime).toContain("for (let y = parity; y < payload.rows; y += 2)");
-  expect(runtime).toContain("await nextFrame();");
+  expect(runtime).toContain("performance.now() - sliceStart >= paintBudgetMs");
+  expect(runtime).toContain("await yieldBrowser();");
+  expect(runtime).not.toContain("await nextFrame();");
+  expect(runtime).not.toContain("const batch =");
   expect(runtime).toContain('cell.className = "cell";');
   expect(css).toContain("grid-template-columns: repeat(var(--cols), var(--cell));");
   expect(css).toContain('.grid[data-unicode-render="rows"] .row');
