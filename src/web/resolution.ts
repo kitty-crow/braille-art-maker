@@ -114,10 +114,17 @@ export const bindResolutionGate = (
   const commitManual = (): void => {
     const requested = Number(valueInput.value);
     const next = Number.isFinite(requested) ? normaliseManual(requested) : committed;
+    if (next === committed) {
+      input.value = String(normaliseSlider(next));
+      valueInput.value = String(next);
+      syncPassed(next);
+      active = null;
+      hideTip();
+      return;
+    }
     if (next > max && opts.confirmAboveMax && !opts.confirmAboveMax(next, max)) {
-      const restore = Math.min(max, Math.max(min, committed));
-      input.value = String(restore);
-      valueInput.value = String(committed > max ? committed : restore);
+      input.value = String(normaliseSlider(committed));
+      valueInput.value = String(committed);
       active = null;
       hideTip();
       return;
@@ -127,7 +134,6 @@ export const bindResolutionGate = (
     syncPassed(next);
     active = null;
     hideTip();
-    if (next === committed) return;
     committed = next;
     onCommit();
   };
