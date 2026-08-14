@@ -10,6 +10,16 @@ const RESET = 0x80;
 const RGB = 0x81;
 const chunkSize = 64 * 1024;
 
+export interface BoundedArt {
+  readonly columns: number;
+  readonly rows: number;
+  readonly masks: Uint8Array;
+  readonly colour: boolean;
+  readonly colourBackground: boolean;
+  readonly fullColour: boolean;
+  readonly cellColours?: readonly CellColour[];
+}
+
 class Bytes {
   private readonly chunks: Uint8Array[] = [];
   private chunk = new Uint8Array(chunkSize);
@@ -42,6 +52,32 @@ class Bytes {
   }
 }
 
+class Reader {
+  private at = 0;
+
+  constructor(private readonly bytes: Uint8Array) {}
+
+  get done(): boolean { return this.at === this.bytes.length; }
+
+  byte(): number {
+    const value = this.bytes[this.at++];
+    if (value === undefined) throw new Error("Bounded Unicode payload ended unexpectedly.");
+    return value;
+  }
+
+  varint(): number {
+    let value = 0;
+    let shift = 0;
+    while (shift <= 28) {
+      const byte = this.byte();
+      value |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) return value >>> 0;
+      shift += 7;
+    }
+    throw new Error("Bounded Unicode payload contains an invalid integer.");
+  }
+}
+
 const putVar = (out: Bytes, value: number): void => {
   let n = value >>> 0;
   while (n >= 0x80) {
@@ -59,6 +95,15 @@ const flagsFor = (cfg: ArtCfg): number => {
   const background = colour && cfg.colourBackground === true;
   const full = background && cfg.fullColour === true;
   return (colour ? FG : 0) | (background ? BG : 0) | (full ? FULL : 0);
+};
+
+const readFlags = (flags: number): { colour: boolean; background: boolean; full: boolean } => {
+  const colour = (flags & FG) !== 0;
+  const background = (flags & BG) !== 0;
+  const full = (flags & FULL) !== 0;
+  if (background && !colour) throw new Error("Bounded Unicode payload has invalid colour flags.");
+  if (full && !background) throw new Error("Bounded Unicode payload has invalid full-colour flags.");
+  return { colour, background, full };
 };
 
 const maskBytes = (art: Art): Uint8Array => {
@@ -99,6 +144,26 @@ const packBits = (source: Uint8Array, out: Bytes): void => {
   }
 };
 
+const unpackBits = (read: Reader, count: number): Uint8Array => {
+  const out = new Uint8Array(count);
+  let at = 0;
+  while (at < count) {
+    const control = read.byte();
+    if (control <= 0x7f) {
+      const length = control + 1;
+      if (at + length > count) throw new Error("Bounded Unicode mask stream is too long.");
+      for (let i = 0; i < length; i += 1) out[at++] = read.byte();
+      continue;
+    }
+    if (control === RESET) throw new Error("Bounded Unicode mask stream contains an invalid token.");
+    const length = 257 - control;
+    if (at + length > count) throw new Error("Bounded Unicode mask run is too long.");
+    out.fill(read.byte(), at, at + length);
+    at += length;
+  }
+  return out;
+};
+
 const packColours = (cells: readonly CellColour[] | undefined, count: number, background: boolean, out: Bytes): void => {
   let previous: Rgb | undefined;
   let at = 0;
@@ -118,12 +183,32 @@ const packColours = (cells: readonly CellColour[] | undefined, count: number, ba
   }
 };
 
+const unpackColours = (read: Reader, count: number): (Rgb | undefined)[] => {
+  const out = new Array<Rgb | undefined>(count);
+  let previous: Rgb | undefined;
+  let at = 0;
+  while (at < count) {
+    const token = read.byte();
+    if (token <= 0x7f) {
+      const run = token + 1;
+      if (at + run > count) throw new Error("Bounded Unicode colour run is too long.");
+      for (let i = 0; i < run; i += 1) out[at++] = previous;
+      continue;
+    }
+    if (token === RESET) previous = undefined;
+    else if (token === RGB) previous = { r: read.byte(), g: read.byte(), b: read.byte() };
+    else throw new Error("Bounded Unicode colour stream contains an invalid token.");
+    out[at++] = previous;
+  }
+  return out;
+};
+
 /**
- * Lossless V1 raw payload for high-resolution browser handoff.
+ * Lossless V1 raw payload for high-resolution browser handoff and persistence.
  *
  * This deliberately uses a chunked byte writer rather than a giant JS number[] so the
- * page can serialise one compact representation and transfer its ArrayBuffer to the
- * embed Worker without structured-cloning the Art/cellColours object graph.
+ * page can serialise one compact representation and transfer or persist it without
+ * structured-cloning the Art/cellColours object graph.
  */
 export const packBoundedRaw = (art: Art, cfg: ArtCfg): Uint8Array => {
   const flags = flagsFor(cfg);
@@ -138,4 +223,26 @@ export const packBoundedRaw = (art: Art, cfg: ArtCfg): Uint8Array => {
   if (colour) packColours(art.cellColours, masks.length, false, out);
   if (background) packColours(art.cellColours, masks.length, true, out);
   return out.finish();
+};
+
+export const unpackBoundedRaw = (bytes: Uint8Array): BoundedArt => {
+  const read = new Reader(bytes);
+  if (read.byte() !== MAGIC_A || read.byte() !== MAGIC_B || read.byte() !== V1) throw new Error("Bounded Unicode payload header is invalid.");
+  const { colour, background, full } = readFlags(read.byte());
+  const columns = read.varint();
+  const rows = read.varint();
+  const count = columns * rows;
+  if (columns < 1 || rows < 1 || !Number.isSafeInteger(count) || count > 8_000_000) throw new Error("Bounded Unicode payload dimensions are invalid.");
+  const masks = unpackBits(read, count);
+  const fg = colour ? unpackColours(read, count) : undefined;
+  const bg = background ? unpackColours(read, count) : undefined;
+  if (!read.done) throw new Error("Bounded Unicode payload has trailing data.");
+  if (!colour) return { columns, rows, masks, colour: false, colourBackground: false, fullColour: false };
+  const cellColours: CellColour[] = new Array(count);
+  for (let i = 0; i < count; i += 1) {
+    const front = fg?.[i];
+    const back = bg?.[i];
+    cellColours[i] = { ...(front ? { fg: front } : {}), ...(back ? { bg: back } : {}) };
+  }
+  return { columns, rows, masks, colour: true, colourBackground: background, fullColour: full, cellColours };
 };

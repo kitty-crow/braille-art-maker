@@ -1,8 +1,10 @@
 import { taggedText } from "../colour/tagged.ts";
 import { makeArt } from "../core/art.ts";
+import { packBoundedRaw } from "../embed/bounded-raw.ts";
 import { denseHtml } from "../html/dense.ts";
 import type { Art, ArtCfg, Dither, Pixels, VecStage } from "../types.ts";
 import { vectorStage } from "../vector/stage.ts";
+import { loadCachedArt, storeCachedArt, storeCachedEmbed, type RestoredArt } from "./art-store.ts";
 import { bindCompare } from "./compare.ts";
 import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
@@ -13,6 +15,8 @@ import { decodeImage } from "./image.ts";
 import { bindResolutionGate } from "./resolution.ts";
 import { bindTooltips } from "./tooltips.ts";
 
+declare const __WEB_VERSION__: string;
+
 type Theme = "light" | "dark";
 
 const activeTheme = (): Theme => {
@@ -21,13 +25,15 @@ const activeTheme = (): Theme => {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 };
 
+const cacheId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
 export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
-  const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
+  const heroColour = qs<HTMLInputElement>("#hero-colour"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
   const columns = qs<HTMLInputElement>("#columns"), columnsValue = qs<HTMLInputElement>("#columns-value"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders"), resolutionTip = qs<HTMLElement>("#resolution-tip");
   const resolutionRange = qs<HTMLElement>(".resolution-range"), resolutionNotch = qs<HTMLElement>(".resolution-notch"), resolutionInfo = qs<HTMLButtonElement>(".resolution-control .slider-info");
-  const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
+  const colour = qs<HTMLInputElement>("#colour"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), embedCode = qs<HTMLElement>("#embed-code");
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
@@ -51,23 +57,35 @@ export const startMaker = (): void => {
   resolutionInfo.setAttribute("aria-label", "About resolution. Above 256 cells is experimental; beyond 765 is extreme, with a 1K memory warning. The slider stops at 2048, while larger values may be entered manually with confirmation.");
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
+  let currentSource: Blob | string = "assets/hero.png";
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
   let makerGeneration = 0, embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
+  let cacheTail: Promise<void> = Promise.resolve();
 
-  const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
-  const makerCfg = (): ArtCfg => ({
-    columns: Number(columnsValue.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
-    colour: colour.checked, colourBackground: colour.checked && colourBg.checked, fullColour: colour.checked && colourBg.checked && fullColour.checked
-  });
-  const heroCfg = (): ArtCfg => heroColour.checked ? {
-    columns: 256, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson", invert: true,
-    colour: true, colourBackground: heroBg.checked, fullColour: heroBg.checked && heroFull.checked
-  } : {
-    columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered", invert: true,
-    colour: false, colourBackground: false, fullColour: false
+  const queueCache = (write: () => Promise<void>): void => {
+    cacheTail = cacheTail.catch(() => {}).then(write).catch(() => {});
   };
 
-  const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);
+  const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
+  const makerCfg = (): ArtCfg => {
+    const full = colour.checked && fullColour.checked;
+    return {
+      columns: Number(columnsValue.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
+      colour: colour.checked, colourBackground: full, fullColour: full,
+    };
+  };
+  const heroCfg = (): ArtCfg => {
+    const full = heroColour.checked && heroFull.checked;
+    return heroColour.checked ? {
+      columns: 256, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson", invert: true,
+      colour: true, colourBackground: full, fullColour: full,
+    } : {
+      columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered", invert: true,
+      colour: false, colourBackground: false, fullColour: false,
+    };
+  };
+
+  const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !fullColour.checked);
   const canvasDark = (theme: Theme = activeTheme()): boolean => theme === "dark" ? !canvasToggle.checked : canvasToggle.checked;
   const setCanvasControl = (dark: boolean, theme: Theme): void => {
     const darkTheme = theme === "dark";
@@ -76,14 +94,14 @@ export const startMaker = (): void => {
   };
   const syncCanvas = (theme: Theme = activeTheme()): void => {
     const dark = canvasDark(theme);
-    const hazard = !dark && colour.checked && !colourBg.checked;
+    const hazard = !dark && colour.checked && !fullColour.checked;
     previewScroll.toggleAttribute("data-canvas-dark", dark);
     previewScroll.toggleAttribute("data-canvas-light", !dark);
     previewInfo.hidden = !hazard;
     if (hazard) {
       previewInfo.dataset.tip = theme === "dark"
-        ? "Foreground-only coloured Unicode can be hard to see on a light surface. Light canvas is on, so some colours may be difficult to see. Turn Light canvas off or enable Colour background for stronger readability."
-        : "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is off, so some colours may be difficult to see. Enable Dark canvas or Colour background for stronger readability.";
+        ? "Foreground-only coloured Unicode can be hard to see on a light surface. Light canvas is on, so some colours may be difficult to see. Turn Light canvas off or enable Full Colour for stronger readability."
+        : "Foreground-only coloured Unicode can be hard to see on a light surface. Dark canvas is off, so some colours may be difficult to see. Enable Dark canvas or Full Colour for stronger readability.";
     }
   };
   const applyAutomaticCanvas = (theme: Theme = activeTheme()): void => {
@@ -92,14 +110,14 @@ export const startMaker = (): void => {
   };
   const syncMakerPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };
   const syncColour = (polarity = false, theme: Theme = activeTheme()): void => {
-    colourBg.disabled = !colour.checked;
-    fullColour.disabled = !colour.checked || !colourBg.checked;
+    fullColour.disabled = !colour.checked;
+    if (!colour.checked) fullColour.checked = false;
     applyAutomaticCanvas(theme);
     if (polarity) syncMakerPolarity(theme);
   };
   const syncHeroColour = (): void => {
-    heroBg.disabled = !heroColour.checked;
-    heroFull.disabled = !heroColour.checked || !heroBg.checked;
+    heroFull.disabled = !heroColour.checked;
+    if (!heroColour.checked) heroFull.checked = false;
   };
   const setEmbedProgress = (done: number, total: number): void => {
     const safeTotal = Math.max(1, total);
@@ -121,19 +139,34 @@ export const startMaker = (): void => {
     return generation;
   };
 
-  const scheduleEmbed = (next: Art, cfg: ArtCfg, generation: number): void => {
+  const scheduleEmbed = (
+    next: Art,
+    cfg: ArtCfg,
+    generation: number,
+    id: string,
+    source: Blob | string,
+    sourceName: string,
+    paths: number,
+    rectangles: number,
+  ): void => {
     if (generation !== embedGeneration || art !== next) return;
     setEmbedProgress(0, 1);
     embedTimer = window.setTimeout(() => {
+      if (generation !== embedGeneration || art !== next) return;
+      const raw = packBoundedRaw(next, cfg);
+      // Snapshot before the high-resolution Worker takes ownership of raw.buffer.
+      const cachedRaw = new Blob([raw.buffer as ArrayBuffer], { type: "application/x-unicode-art" });
+      queueCache(() => storeCachedArt(__WEB_VERSION__, id, source, sourceName, cfg, paths, rectangles, next, cachedRaw));
       void embedHtml(next, cfg, "auto", "auto", progress => {
         if (generation !== embedGeneration || art !== next) return;
         setEmbedProgress(progress.done, progress.total);
-      }).then(value => {
+      }, raw).then(value => {
         if (generation !== embedGeneration || art !== next) return;
         embed = value;
         setEmbedProgress(1, 1);
         embedView.render(value);
         copyEmbed.disabled = false;
+        queueCache(() => storeCachedEmbed(__WEB_VERSION__, id, value));
       }).catch(error => {
         if (generation !== embedGeneration) return;
         embedProgress.hidden = false;
@@ -146,7 +179,10 @@ export const startMaker = (): void => {
   const generateMaker = (): void => {
     if (!vector) return;
     const source = vector;
+    const sourceValue = currentSource;
+    const sourceName = name;
     const cfg = makerCfg();
+    const id = cacheId();
     const local = ++makerGeneration;
     const embedLocal = resetEmbed();
     const highResolution = (cfg.columns ?? 96) > 256;
@@ -162,7 +198,7 @@ export const startMaker = (): void => {
       await renderDense(output, next);
       if (local !== makerGeneration || art !== next) return;
       setStatus("Ready");
-      scheduleEmbed(next, cfg, embedLocal);
+      scheduleEmbed(next, cfg, embedLocal, id, sourceValue, sourceName, source.paths, source.rectangles);
     })().catch(error => {
       if (local !== makerGeneration) return;
       setStatus(error instanceof Error ? error.message : "Rendering failed.");
@@ -176,8 +212,6 @@ export const startMaker = (): void => {
   };
 
   const applyThemeDefaults = (theme: Theme): void => {
-    const light = theme === "light";
-    heroBg.checked = light;
     heroFull.checked = false;
     syncHeroColour();
     syncColour(true, theme);
@@ -190,12 +224,13 @@ export const startMaker = (): void => {
     setStatus("Reading image…", true);
     const decoded = await decodeImage(source);
     if (local !== loadGeneration) { if (decoded.revoke) URL.revokeObjectURL(decoded.url); return; }
-    name = nextName;
     setStatus("Vectorising…", true);
     await new Promise(requestAnimationFrame);
     const nextVector = vectorStage(decoded.pixels, { colours: 64, alphaLevels: 16 });
     if (local !== loadGeneration) { if (decoded.revoke) URL.revokeObjectURL(decoded.url); return; }
     vector = nextVector;
+    currentSource = source;
+    name = nextName;
     if (seedHero) {
       heroPixels = nextVector.pixels;
       if (heroObjectUrl) URL.revokeObjectURL(heroObjectUrl);
@@ -206,6 +241,80 @@ export const startMaker = (): void => {
     generateMaker();
   };
 
+  const rebuildVector = async (source: Blob | string, nextName: string, local: number): Promise<void> => {
+    try {
+      const decoded = await decodeImage(source);
+      if (local !== loadGeneration) { if (decoded.revoke) URL.revokeObjectURL(decoded.url); return; }
+      await new Promise(requestAnimationFrame);
+      const nextVector = vectorStage(decoded.pixels, { colours: 64, alphaLevels: 16 });
+      if (local !== loadGeneration) { if (decoded.revoke) URL.revokeObjectURL(decoded.url); return; }
+      vector = nextVector;
+      currentSource = source;
+      name = nextName;
+      if (decoded.revoke) URL.revokeObjectURL(decoded.url);
+    } catch (error) {
+      console.warn("Could not restore the cached source for editing.", error);
+    }
+  };
+
+  const loadHeroDemo = async (): Promise<void> => {
+    try {
+      const decoded = await decodeImage("assets/hero.png");
+      const nextVector = vectorStage(decoded.pixels, { colours: 64, alphaLevels: 16 });
+      heroPixels = nextVector.pixels;
+      if (heroObjectUrl) URL.revokeObjectURL(heroObjectUrl);
+      heroImg.src = decoded.url;
+      heroObjectUrl = decoded.revoke ? decoded.url : null;
+      generateHero();
+    } catch (error) {
+      console.warn("Could not load the hero demo.", error);
+    }
+  };
+
+  const applyCachedControls = (cfg: ArtCfg): void => {
+    const requested = Math.max(resolutionMin, Math.round(cfg.columns ?? 96));
+    columnsValue.value = String(requested);
+    columns.value = String(Math.min(resolutionMax, requested));
+    contrast.value = String(cfg.contrast ?? 1.12);
+    detail.value = String(cfg.detail ?? 0.34);
+    bias.value = String(cfg.bias ?? 0.015);
+    dither.value = cfg.dither ?? "ordered";
+    invert.checked = cfg.invert ?? true;
+    colour.checked = cfg.colour === true;
+    fullColour.checked = colour.checked && cfg.fullColour === true;
+    syncColour(false);
+  };
+
+  const restoreCached = async (cached: RestoredArt): Promise<void> => {
+    const local = ++loadGeneration;
+    ++makerGeneration;
+    window.clearTimeout(embedTimer);
+    cancelEmbedHtml();
+    const generation = ++embedGeneration;
+    vector = null;
+    currentSource = cached.source;
+    name = cached.name;
+    applyCachedControls(cached.cfg);
+    art = cached.art;
+    metrics.textContent = `${cached.art.columns}×${cached.art.rows} cells · ${(cached.art.density * 100).toFixed(1)}% dots · ${cached.paths} paths${cached.art.cellColours ? " · colour" : ""}`;
+    setStatus("Restoring cached art…", true);
+    await renderDense(output, cached.art);
+    if (local !== loadGeneration || art !== cached.art) return;
+    setStatus("Ready");
+    embedProgress.hidden = true;
+    if (cached.embed !== undefined) {
+      embed = cached.embed;
+      embedView.render(cached.embed);
+      copyEmbed.disabled = false;
+    } else {
+      embed = "";
+      copyEmbed.disabled = true;
+      embedCode.textContent = "Generating embed";
+      scheduleEmbed(cached.art, cached.cfg, generation, cached.id, cached.source, cached.name, cached.paths, cached.rectangles);
+    }
+    void rebuildVector(cached.source, cached.name, local);
+  };
+
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
@@ -214,17 +323,23 @@ export const startMaker = (): void => {
   });
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
-    if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
-    syncColour(true); schedule();
+    fullColour.checked = false;
+    syncColour(true);
+    schedule();
   });
-  for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(true); schedule(); });
+  fullColour.addEventListener("change", () => { syncColour(true); schedule(); });
   canvasToggle.addEventListener("change", () => {
     manualCanvasDark = canvasDark();
     syncCanvas();
     syncMakerPolarity();
     schedule();
   });
-  for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
+  heroColour.addEventListener("change", () => {
+    heroFull.checked = false;
+    syncHeroColour();
+    generateHero();
+  });
+  heroFull.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   reset.addEventListener("click", () => {
     columns.value = "96";
     columnsValue.value = columns.value;
@@ -257,5 +372,14 @@ export const startMaker = (): void => {
   if (output.parentElement) observer.observe(output.parentElement);
   syncColour();
   applyThemeDefaults(activeTheme());
-  void loadMaker("assets/hero.png", "hero", true);
+
+  void (async () => {
+    const cached = await loadCachedArt(__WEB_VERSION__).catch(() => null);
+    if (cached) {
+      void loadHeroDemo();
+      await restoreCached(cached);
+      return;
+    }
+    await loadMaker("assets/hero.png", "hero", true);
+  })();
 };

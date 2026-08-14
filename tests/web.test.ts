@@ -24,23 +24,22 @@ test("ordered dithering and inverted polarity remain core and CLI defaults", asy
 test("hero uses detailed colour without inheriting the maker maximum", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
-  expect(html).toContain('id="hero-colour" type="checkbox" checked');
-  expect(html).toContain('id="hero-background" type="checkbox" checked');
-  expect(html).toContain('id="hero-full-colour" type="checkbox">');
+  expect(html).toContain('id="hero-colour" type="checkbox" checked> Colour');
+  expect(html).toContain('id="hero-full-colour" type="checkbox"> Full Colour');
+  expect(html).not.toContain('id="hero-background"');
   expect(maker).toContain('columns: 256, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson"');
   expect(maker).not.toContain('columns: maxColumns');
   expect(maker).toContain('columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered"');
 });
 
-test("light and dark themes apply visibility-friendly defaults", async () => {
+test("light and dark themes keep visibility-friendly colour defaults", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   const config = await readFile(join(root, "pages.config.ts"), "utf8");
-  expect(html).toContain('id="hero-background" type="checkbox" checked');
+  expect(html).not.toContain('id="hero-background"');
   expect(html).toContain('id="invert" type="checkbox"> Invert image polarity');
   expect(html).not.toContain('id="invert" type="checkbox" checked');
   expect(config).toContain('event: "unicode-art-theme"');
-  expect(maker).toContain('heroBg.checked = light;');
   expect(maker).toContain('heroFull.checked = false;');
   expect(maker).toContain('syncColour(true, theme);');
 });
@@ -57,12 +56,12 @@ test("canvas toggle is the first checkbox and forces the opposite surface in eac
   expect(canvasAt).toBeLessThan(colourAt);
   expect(html).toContain('id="canvas-toggle-label">Dark canvas</span>');
   expect(html).toContain('id="preview-contrast-info"');
-  expect(maker).toContain('const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !colourBg.checked);');
+  expect(maker).toContain('const automaticDarkCanvas = (theme: Theme = activeTheme()): boolean => theme === "dark" || (colour.checked && !fullColour.checked);');
   expect(maker).toContain('canvasToggleLabel.textContent = darkTheme ? "Light canvas" : "Dark canvas";');
   expect(maker).toContain('canvasToggle.checked = darkTheme ? !dark : dark;');
   expect(maker).toContain('previewScroll.toggleAttribute("data-canvas-dark", dark);');
   expect(maker).toContain('previewScroll.toggleAttribute("data-canvas-light", !dark);');
-  expect(maker).toContain('const hazard = !dark && colour.checked && !colourBg.checked;');
+  expect(maker).toContain('const hazard = !dark && colour.checked && !fullColour.checked;');
   expect(maker).toContain('manualCanvasDark = canvasDark();');
   expect(maker).toContain('Light canvas is on, so some colours may be difficult to see.');
   expect(maker).toContain('Dark canvas is off, so some colours may be difficult to see.');
@@ -108,17 +107,19 @@ test("maker gates high resolutions, stops the slider at 2048 and allows confirme
   expect(css).toContain('.resolution-notch');
 });
 
-test("maker keeps the non-resolution slider and colour defaults", async () => {
+test("maker exposes only foreground Colour and Full Colour", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   expect(html).toContain('id="contrast" type="range" min="0.55" max="1.9" step="0.01" value="1.12"');
   expect(html).toContain('id="detail" type="range" min="0" max="1.2" step="0.01" value="0.34"');
   expect(html).toContain('id="bias" type="range" min="-0.25" max="0.25" step="0.005" value="0.015"');
-  expect(html).toContain('id="colour" type="checkbox"> Colour output');
-  expect(html).toContain('id="colour-background" type="checkbox" disabled>');
-  expect(html).toContain('id="full-colour" type="checkbox" disabled>');
+  expect(html).toContain('id="colour" type="checkbox"> Colour');
+  expect(html).toContain('id="full-colour" type="checkbox" disabled> Full Colour');
+  expect(html).not.toContain('id="colour-background"');
+  expect(maker).toContain('const full = colour.checked && fullColour.checked;');
+  expect(maker).toContain('colour: colour.checked, colourBackground: full, fullColour: full');
   expect(maker).toContain('dither.value = colour.checked ? "atkinson" : "ordered"');
-  expect(maker).toContain('if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }');
+  expect(maker).toContain('fullColour.checked = false;');
 });
 
 test("maker packs paste-ready embeds in a dedicated worker with transient progress", async () => {
@@ -150,6 +151,26 @@ test("maker packs paste-ready embeds in a dedicated worker with transient progre
   expect(worker).toContain('codec: embedCodec');
   expect(worker).toContain('src: __EMBED_SRC__');
   expect(worker).not.toContain("taggedText");
+});
+
+test("maker persists the latest compact art and finished embed in IndexedDB", async () => {
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  const store = await readFile(join(root, "src", "web", "art-store.ts"), "utf8");
+  const bounded = await readFile(join(root, "src", "embed", "bounded-raw.ts"), "utf8");
+  expect(store).toContain('const dbName = "unicode-art-maker-cache";');
+  expect(store).toContain('const dbVersion = 2;');
+  expect(store).toContain('const sessionStore = "session-v2";');
+  expect(store).toContain('const artStore = "art-v2";');
+  expect(store).toContain('const embedStore = "embed-v2";');
+  expect(store).toContain('transaction.objectStore(artStore).put(payload, latestKey);');
+  expect(store).toContain('html: new Blob([html]');
+  expect(store).not.toContain('.put(art,');
+  expect(maker).toContain('const cachedRaw = new Blob([raw.buffer as ArrayBuffer]');
+  expect(maker).toContain('storeCachedArt(__WEB_VERSION__');
+  expect(maker).toContain('storeCachedEmbed(__WEB_VERSION__');
+  expect(maker).toContain('loadCachedArt(__WEB_VERSION__)');
+  expect(maker).toContain('await restoreCached(cached);');
+  expect(bounded).toContain('export const unpackBoundedRaw');
 });
 
 test("embed code is rendered through Marked, DOMPurify and Highlight.js", async () => {
