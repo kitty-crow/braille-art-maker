@@ -16,15 +16,19 @@ New embeds use the lossless `u4` codec. It searches exact alternatives instead o
 
 Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas and bit-plane shuffling. Colour candidates include exact foreground/background pair palettes, bit-packed RGB palettes, spatial RGB residuals and reversible YCoCg residuals. The complete `u3` candidate family remains in the search as a fallback.
 
-Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. The shortest actual encoded payload wins. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
+Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
 
-The final bytes use safe ASCII basE91. Brotli is the implicit transport and therefore costs no marker byte; raw or DEFLATE carry a tiny marker only when they are genuinely shorter.
+`u4` now compares two text transports for every binary candidate. The established basE91 transport remains available and is still the byte-efficient ASCII form. The experimental CJK-4096 transport maps each 12 bits to one BMP CJK Unified Ideograph in the contiguous range U+4E00 through U+5DFF. A small explicit marker records compression mode and the final 0/1/2-byte remainder, so arbitrary binary payloads round-trip exactly.
+
+The optimiser chooses the shortest **JavaScript/clipboard character count**, not the fewest UTF-8 bytes. CJK-4096 therefore normally wins for non-trivial payloads because it carries 12 bits per character versus roughly 6.5 bits per basE91 character. Its visible/source payload is typically about 54% of the basE91 character count, at the cost of larger UTF-8 transfer size because each CJK character occupies three UTF-8 bytes. Encoding and decoding are linear bit packing/unpacking; Brotli remains the expensive part of embed generation.
+
+Old `u4` payloads remain valid. Unmarked Brotli basE91 and the existing `&r` / `&d` basE91 forms decode exactly as before. CJK-4096 uses an explicit uppercase `&R`, `&D` or `&B` marker plus its remainder digit, so the transport is never guessed from arbitrary Unicode.
 
 New fragments keep only the outer host configuration, one self-identifying payload script and one loader script in the copied HTML. The Shadow DOM scaffold and stylesheet link are reconstructed by `embed.js`, and `load.js` derives the API URL from its own URL. Static template markup is therefore not repeated in every embed.
 
-The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2` and `u3`, so previously copied embeds continue to work.
+The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2`, `u3` and previous basE91 `u4` payloads, so previously copied embeds continue to work.
 
-Base256/base512 text encodings are not used because non-ASCII code points take multiple bytes in UTF-8 HTML. A safe single-byte ASCII transport is smaller in transferred HTML.
+The template validator accepts CJK-4096 only when it has the explicit transport marker and every payload character is inside U+4E00–U+5DFF. Arbitrary Unicode is still rejected. Tests also verify that the entire 4,096-character alphabet is unchanged by NFC, NFD, NFKC and NFKD normalization.
 
 ## Browser
 
