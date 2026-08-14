@@ -1,6 +1,6 @@
 {
   "name": "@kitty-crow/unicode-art-maker",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "PNG to dense Unicode art for Bun and the browser.",
   "type": "module",
   "license": "MIT",

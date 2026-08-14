@@ -99,6 +99,14 @@ test("embed code is rendered through Marked, DOMPurify and Highlight.js", async 
   expect(css).toContain("var(--code-attr)");
 });
 
+test("top navigation stays pinned as the page scrolls", async () => {
+  const css = await readFile(join(root, "web", "styles", "header.css"), "utf8");
+  expect(css).toContain("position:sticky");
+  expect(css).toContain("top:8px");
+  expect(css).toContain("z-index:100");
+  expect(css).toContain("backdrop-filter:blur(18px)");
+});
+
 test("range controls have pointer-following accessible info tooltips", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const tips = await readFile(join(root, "src", "web", "tooltips.ts"), "utf8");
@@ -130,7 +138,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.6");
+  expect(pkg.version).toBe("0.4.7");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });
