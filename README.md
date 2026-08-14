@@ -20,19 +20,19 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 1024 horizontal Unicode cells; resolutions above 256 cells are explicitly experimental because browser rendering, memory use and embed generation can become unreliable or extremely slow.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads, paste-ready CDN embeds and a draggable PNG/Unicode hero comparison. The top navigation remains pinned while the page scrolls. The maker supports up to 1024 horizontal Unicode cells; resolutions above 256 cells are explicitly experimental because browser rendering, memory use and embed generation become much heavier and performance drops significantly.
 
-The Width slider has a resistance notch at 256 cells. A normal pointer drag stops there and shows a pointer-following experimental warning; pushing farther through the notch releases the slider into the 257-1024 range. This warning gate is UI-only: the core/CLI ceiling is 1024.
+The Resolution slider has a resistance notch at 256 cells. A normal pointer drag stops there and shows a pointer-following experimental warning; pushing farther through the notch releases the slider into the 257-1024 range. The numerical Resolution value beside the label is directly editable from 24 through 1024 and stays synchronised with the slider. This warning gate is UI-only: the core/CLI ceiling is 1024.
 
 The hero starts in colour at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
 The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. The canvas control is the first checkbox. It reads **Dark canvas** in light mode and forces a dark preview surface when enabled; in dark mode it reads **Light canvas** and forces a light preview surface when enabled. Once changed manually, the maker keeps the actual selected surface across later theme/colour changes. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
 
-**Reset sliders** restores only Width, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
+**Reset sliders** restores only Resolution, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves colour mode, background/full-colour selections, dither, canvas and polarity untouched.
 
 Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
-The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Compact embed optimisation runs in a Worker and reports progress in the maker.
+The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Embed generation runs in a Worker. While it is running the maker shows **Generating embed** and an **Encoding art…** progress bar; the progress UI is hidden automatically when encoding reaches 100%.
 
 Colour modes:
 
