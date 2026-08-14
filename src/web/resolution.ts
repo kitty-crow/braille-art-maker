@@ -8,14 +8,16 @@ export interface ResolutionGateOpts {
 
 export const bindResolutionGate = (
   input: HTMLInputElement,
-  output: HTMLOutputElement,
+  valueInput: HTMLInputElement,
   tip: HTMLElement,
   onInput: () => void,
   opts: ResolutionGateOpts = {},
 ): void => {
   const notch = opts.notch ?? 256;
   const resistance = opts.resistancePx ?? 34;
-  const message = opts.message ?? "Resolutions above 256 cells are experimental. Visual rendering may be flaky and performance can be terrible. Keep dragging to continue.";
+  const message = opts.message ?? "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue.";
+  const min = Number(input.min);
+  const max = Number(input.max);
   let pointer: number | null = null;
   let released = Number(input.value) > notch;
   let gateX: number | null = null;
@@ -39,21 +41,29 @@ export const bindResolutionGate = (
 
   const valueAt = (x: number): number => {
     const rect = input.getBoundingClientRect();
-    const min = Number(input.min);
-    const max = Number(input.max);
     const ratio = clamp((x - rect.left) / Math.max(1, rect.width), 0, 1);
     return Math.round(min + ratio * (max - min));
   };
 
   const notchX = (): number => gateX ?? pointerX;
+  const normalise = (value: number): number => Math.round(clamp(value, min, max));
 
   const setValue = (value: number): boolean => {
-    const next = String(value);
-    if (input.value === next) { output.value = next; return false; }
+    const next = String(normalise(value));
+    const changed = input.value !== next;
     input.value = next;
-    output.value = next;
-    onInput();
-    return true;
+    valueInput.value = next;
+    if (changed) onInput();
+    return changed;
+  };
+
+  const commitManual = (): void => {
+    const requested = Number(valueInput.value);
+    const next = Number.isFinite(requested) ? normalise(requested) : Number(input.value);
+    setValue(next);
+    released = next > notch;
+    gateX = null;
+    hideTip();
   };
 
   input.addEventListener("pointerdown", event => {
@@ -100,13 +110,32 @@ export const bindResolutionGate = (
     const requested = Number(input.value);
     if (pointer !== null && !released && requested > notch) {
       input.value = String(notch);
-      output.value = input.value;
+      valueInput.value = input.value;
       showTip();
       onInput();
       return;
     }
-    output.value = input.value;
+    valueInput.value = input.value;
     onInput();
+  });
+
+  valueInput.addEventListener("input", () => {
+    if (!valueInput.value.trim()) return;
+    const requested = Number(valueInput.value);
+    if (!Number.isFinite(requested) || requested < min || requested > max) return;
+    const next = normalise(requested);
+    input.value = String(next);
+    released = next > notch;
+    gateX = null;
+    hideTip();
+    onInput();
+  });
+  valueInput.addEventListener("change", commitManual);
+  valueInput.addEventListener("blur", commitManual);
+  valueInput.addEventListener("keydown", event => {
+    if (event.key !== "Enter") return;
+    commitManual();
+    valueInput.blur();
   });
 
   const finish = (event: PointerEvent): void => {
