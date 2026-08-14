@@ -26,10 +26,25 @@ export const startMaker = (): void => {
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
   const columns = qs<HTMLInputElement>("#columns"), columnsValue = qs<HTMLInputElement>("#columns-value"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert"), canvasToggle = qs<HTMLInputElement>("#canvas-toggle"), canvasToggleLabel = qs<HTMLElement>("#canvas-toggle-label"), reset = qs<HTMLButtonElement>("#reset-sliders"), resolutionTip = qs<HTMLElement>("#resolution-tip");
+  const resolutionRange = qs<HTMLElement>(".resolution-range"), resolutionNotch = qs<HTMLElement>(".resolution-notch"), resolutionInfo = qs<HTMLButtonElement>(".resolution-control .slider-info");
   const colour = qs<HTMLInputElement>("#colour"), colourBg = qs<HTMLInputElement>("#colour-background"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), embedCode = qs<HTMLElement>("#embed-code");
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
   const embedView = new EmbedView(embedCode);
+
+  const resolutionMax = 4096;
+  const resolutionMin = Number(columns.min);
+  const notchPosition = (value: number): string => `${(value - resolutionMin) / (resolutionMax - resolutionMin) * 100}%`;
+  columns.max = String(resolutionMax);
+  columnsValue.max = columns.max;
+  resolutionNotch.style.left = notchPosition(256);
+  const extremeNotch = document.createElement("span");
+  extremeNotch.className = "resolution-notch resolution-notch-extreme";
+  extremeNotch.style.left = notchPosition(765);
+  extremeNotch.setAttribute("aria-hidden", "true");
+  resolutionRange.appendChild(extremeNotch);
+  resolutionInfo.dataset.tip = "Controls horizontal Unicode cell count. Above 256 is experimental. Beyond 765 is extreme territory where memory, battery and browser limits become very real.";
+  resolutionInfo.setAttribute("aria-label", "About resolution. Above 256 cells is experimental; beyond 765 cells is extreme and may exhaust browser resources.");
 
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
@@ -190,10 +205,7 @@ export const startMaker = (): void => {
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
-  bindResolutionGate(columns, columnsValue, resolutionTip, schedule, { gates: [
-    { value: 256, resistancePx: 34, message: "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue." },
-    { value: 765, resistancePx: 34, message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself." },
-  ] });
+  bindResolutionGate(columns, columnsValue, resolutionTip, schedule);
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
