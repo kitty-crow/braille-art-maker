@@ -19,4 +19,4 @@ const server = Bun.serve({
   }
 });
 
-console.log(`Braille Art Maker: http://localhost:${server.port}`);
+console.log(`Unicode Art Maker: http://localhost:${server.port}`);

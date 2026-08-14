@@ -4,6 +4,6 @@
 [submodule "vendor/vectoriser"]
 	path = vendor/vectoriser
 	url = https://github.com/kitty-crow/vectoriser
-[submodule "vendor/braille-qr"]
-	path = vendor/braille-qr
+[submodule "vendor/unicode-grid"]
+	path = vendor/unicode-grid
 	url = https://github.com/kitty-crow/braille-qr

@@ -17,7 +17,7 @@ export default definePages({
   runtime: {
     base: "/braille-art-maker/",
     theme: {
-      key: "braille-art-maker.theme",
+      key: "unicode-art-maker.theme",
       colours: { light: "#f7f3f1", dark: "#111016" },
       toggle: "[data-theme-toggle]",
       label: "[data-theme-label]"

@@ -1,7 +1,7 @@
 const masks = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]] as const;
 
-export const packBraille = (dots: Uint8Array, width: number, height: number): string => {
-  if (width % 2 || height % 4) throw new Error("Braille dot dimensions must be divisible by 2x4 cells.");
+export const packUnicode = (dots: Uint8Array, width: number, height: number): string => {
+  if (width % 2 || height % 4) throw new Error("Unicode dot dimensions must be divisible by 2x4 cells.");
   const lines: string[] = [];
   for (let y = 0; y < height; y += 4) {
     let line = "";

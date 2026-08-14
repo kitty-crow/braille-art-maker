@@ -1,6 +1,6 @@
-# Braille Art Maker
+# Unicode Art Maker
 
-PNG to dense Unicode Braille art for Bun and the browser, with optional true-colour foreground/background cells.
+PNG to dense Unicode text art for Bun and the browser, with optional true-colour foreground/background cells.
 
 ## Install
 
@@ -20,13 +20,17 @@ bun run site:dev
 
 Open `http://localhost:4173`.
 
-The browser app supports PNG upload, live Braille preview, ordered/Atkinson/Floyd-Steinberg/threshold dithering, monochrome or colour output, TXT/HTML/SVG downloads and a draggable PNG/Braille hero comparison. The hero uses full colour by default; maker output starts monochrome.
+The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads and a draggable PNG/Unicode hero comparison.
+
+The hero starts in foreground-only colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
+
+The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off.
 
 Colour modes:
 
-- foreground colour follows the normal Braille mask
-- background colour also preserves pixels that fall on the off side of the mask
-- full colour clusters each 2x4 source cell into up to two colours and uses the Braille mask to encode the split
+- foreground colour follows the normal Unicode mask
+- background colour can preserve pixels on the off side of the mask
+- full colour can split each 2x4 source cell into two perceptual colour groups
 
 ## CLI
 
@@ -41,7 +45,7 @@ bun run cli -- image.png --full-colour --ansi
 Useful options:
 
 ```text
---columns <n>          Braille columns, default 96
+--columns <n>          Unicode columns, default 96
 --dither <mode>        atkinson|floyd|ordered|threshold, default ordered
 --invert               inverted polarity, default
 --no-invert            disable inverted polarity
@@ -54,45 +58,23 @@ Useful options:
 -o, --output <path>    write output instead of stdout
 ```
 
-Colour TXT uses the same tag family as `extras/term/colour.h`:
-
-```text
-<#ff6688>foreground
-<@#221122>background
-<#default><@#default>
-```
-
-The header also accepts `#define name = #rrggbb;`, `<name>` and `<@name>` aliases.
-
 ## Terminal viewer
 
 ```bash
-cc -std=c11 -Wall -Wextra -Wpedantic -Werror \
-  extras/term/braille-colour-view.c -o braille-colour-view
-./braille-colour-view image.txt
+cc -std=c11 -Wall -Wextra -Wpedantic -Werror extras/term/unicode-colour-view.c -o unicode-colour-view
+./unicode-colour-view image.txt
 ```
-
-The viewer converts foreground tags to ANSI `38;2`, background tags to `48;2`, and keeps the tags zero-width for code using the header's `mbrtowc`/`wcwidth` wrappers.
 
 ## API
 
 ```ts
-import { makeArt, taggedText, vectorStage } from "@kitty-crow/braille-art-maker";
-
-const vector = vectorStage({ width, height, data: rgba });
-const art = makeArt(vector.pixels, {
-  columns: 96,
-  colour: true,
-  colourBackground: true,
-  fullColour: true
-});
-console.log(taggedText(art));
+import { makeArt, taggedText, vectorStage } from "@kitty-crow/unicode-art-maker";
 ```
 
 ## Project layout
 
 ```text
-src/core/        Braille signal, tone, dithering and packing
+src/core/        Unicode signal, tone, dithering and packing
 src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
@@ -109,9 +91,9 @@ docs/            project documentation
 ## Vendor dependencies
 
 ```text
-vendor/pages       kitty-crow/github-pages-template
-vendor/vectoriser  kitty-crow/vectoriser
-vendor/braille-qr  kitty-crow/braille-qr
+vendor/pages         kitty-crow/github-pages-template
+vendor/vectoriser    kitty-crow/vectoriser
+vendor/unicode-grid  kitty-crow/braille-qr
 ```
 
 ## Documentation

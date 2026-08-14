@@ -4,8 +4,11 @@ export interface ArtSize {
   readonly rows: number;
 }
 
+export const minColumns = 8;
+export const maxColumns = 240;
+
 export const artSize = (width: number, height: number, columns = 96): ArtSize => {
-  const cols = Math.max(8, Math.min(240, Math.round(columns)));
+  const cols = Math.max(minColumns, Math.min(maxColumns, Math.round(columns)));
   const dotsWidth = cols * 2;
   const rawHeight = Math.max(4, Math.round(dotsWidth * height / width));
   const dotsHeight = Math.max(4, Math.round(rawHeight / 4) * 4);

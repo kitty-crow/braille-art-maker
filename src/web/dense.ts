@@ -22,14 +22,14 @@ export const fitDense = (host: HTMLElement): void => {
   const target = Math.min(width / columns, height / (rows * 2));
   const probe = document.createElement("span");
   probe.textContent = "⣿".repeat(100);
-  probe.className = "braille-probe";
+  probe.className = "unicode-probe";
   probe.style.fontSize = "100px";
   host.appendChild(probe);
   const natural = probe.getBoundingClientRect().width / 100 || 60;
   probe.remove();
   host.style.setProperty("--cell-w", `${target}px`);
   host.style.setProperty("--cell-h", `${target * 2}px`);
-  host.style.setProperty("--braille-font", `${100 * target / natural}px`);
+  host.style.setProperty("--unicode-font", `${100 * target / natural}px`);
   host.style.width = `${columns * target}px`;
   host.style.height = `${rows * target * 2}px`;
 };
@@ -50,10 +50,10 @@ export const renderDense = (host: HTMLElement, source: string | Art): void => {
   let ci = 0;
   for (const line of lines) {
     const row = document.createElement("div");
-    row.className = "braille-row";
+    row.className = "unicode-row";
     for (const char of line.padEnd(columns, "⠀")) {
       const cell = document.createElement("span");
-      cell.className = "braille-cell";
+      cell.className = "unicode-cell";
       cell.textContent = char;
       paint(cell, colours?.[ci++]);
       row.appendChild(cell);

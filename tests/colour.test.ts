@@ -23,7 +23,7 @@ test("uniform full colour fills foreground and background with one colour", () =
   expect(result.cells[0]?.fg).toEqual(result.cells[0]?.bg);
 });
 
-test("background colour survives an entirely off Braille mask", () => {
+test("background colour survives an entirely off Unicode mask", () => {
   const data = px(Array.from({ length: 8 }, () => [190, 35, 70] as [number,number,number]));
   const result = colourCells({ width: 2, height: 4, data }, new Uint8Array(8), true, false);
   expect(result.cells[0]?.fg).toBeUndefined();
@@ -39,7 +39,7 @@ test("tagged text emits foreground and background tags", () => {
   expect(taggedToAnsi(text)).toContain("\x1b[48;2;0;0;255m");
 });
 
-test("tagged text can colour a blank Braille cell through its background", () => {
+test("tagged text can colour a blank Unicode cell through its background", () => {
   const art = { text: "⠀", columns: 1, rows: 1, dotsWidth: 2, dotsHeight: 4, threshold: 0.5, density: 0, cellColours: [{ bg: { r: 12, g: 34, b: 56 } }] } as const;
   expect(taggedText(art)).toContain("<@#0c2238>⠀");
 });

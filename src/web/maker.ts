@@ -1,5 +1,6 @@
 import { taggedText } from "../colour/tagged.ts";
 import { makeArt } from "../core/art.ts";
+import { maxColumns } from "../core/size.ts";
 import { denseHtml } from "../html/dense.ts";
 import type { Art, ArtCfg, Dither, Pixels, VecStage } from "../types.ts";
 import { vectorStage } from "../vector/stage.ts";
@@ -8,9 +9,10 @@ import { fitDense, renderDense } from "./dense.ts";
 import { qs } from "./dom.ts";
 import { download } from "./download.ts";
 import { decodeImage } from "./image.ts";
+import { bindTooltips } from "./tooltips.ts";
 
 export const startMaker = (): void => {
-  const heroImg = qs<HTMLImageElement>("#hero-source"), heroBraille = qs<HTMLElement>("#hero-braille"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
+  const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status");
   const columns = qs<HTMLInputElement>("#columns"), contrast = qs<HTMLInputElement>("#contrast"), detail = qs<HTMLInputElement>("#detail"), bias = qs<HTMLInputElement>("#bias"), dither = qs<HTMLSelectElement>("#dither"), invert = qs<HTMLInputElement>("#invert");
@@ -25,7 +27,13 @@ export const startMaker = (): void => {
     columns: Number(columns.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
     colour: colour.checked, colourBackground: colour.checked && colourBg.checked, fullColour: colour.checked && colourBg.checked && fullColour.checked
   });
-  const heroCfg = (): ArtCfg => ({ columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered", invert: true, colour: heroColour.checked, colourBackground: heroColour.checked && heroBg.checked, fullColour: heroColour.checked && heroBg.checked && heroFull.checked });
+  const heroCfg = (): ArtCfg => heroColour.checked ? {
+    columns: maxColumns, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson", invert: true,
+    colour: true, colourBackground: heroBg.checked, fullColour: heroBg.checked && heroFull.checked
+  } : {
+    columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered", invert: true,
+    colour: false, colourBackground: false, fullColour: false
+  };
 
   const syncColour = (): void => {
     colourBg.disabled = !colour.checked;
@@ -48,7 +56,7 @@ export const startMaker = (): void => {
   const generateHero = (): void => {
     if (!heroPixels) return;
     const next = makeArt(heroPixels, heroCfg());
-    renderDense(heroBraille, next);
+    renderDense(heroUnicode, next);
   };
 
   const loadMaker = async (source: Blob | string, nextName: string, seedHero = false): Promise<void> => {
@@ -75,7 +83,12 @@ export const startMaker = (): void => {
   let debounce = 0;
   const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
   for (const control of [columns, contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
-  for (const control of [colour, colourBg, fullColour]) control.addEventListener("change", () => { syncColour(); schedule(); });
+  colour.addEventListener("change", () => {
+    dither.value = colour.checked ? "atkinson" : "ordered";
+    if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
+    syncColour(); schedule();
+  });
+  for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(); schedule(); });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   columns.addEventListener("input", () => { columnsOut.value = columns.value; });
 
@@ -91,7 +104,8 @@ export const startMaker = (): void => {
   svg.addEventListener("click", () => vector?.svg && download(`${name}.svg`, "image/svg+xml;charset=utf-8", vector.svg));
 
   bindCompare(compare, divider);
-  const observer = new ResizeObserver(() => { fitDense(heroBraille); fitDense(output); });
+  bindTooltips();
+  const observer = new ResizeObserver(() => { fitDense(heroUnicode); fitDense(output); });
   observer.observe(compare);
   if (output.parentElement) observer.observe(output.parentElement);
   syncColour(); syncHeroColour();

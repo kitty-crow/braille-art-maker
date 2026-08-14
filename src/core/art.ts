@@ -1,16 +1,16 @@
 import type { Art, ArtCfg, Pixels } from "../types.ts";
 import { colourCells } from "../colour/cells.ts";
-import { packBraille } from "./braille.ts";
+import { packUnicode } from "./unicode.ts";
 import { dither } from "./dither.ts";
 import { resize } from "./resize.ts";
 import { signal } from "./signal.ts";
-import { artSize } from "./size.ts";
+import { artSize, maxColumns, minColumns } from "./size.ts";
 import { contrast, otsu, sharpen, stretch } from "./tone.ts";
 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 
 export const makeArt = (pixels: Pixels, cfg: ArtCfg = {}): Art => {
-  const columns = Math.max(8, Math.min(240, Math.round(cfg.columns ?? Math.max(48, Math.min(112, pixels.width / 5)))));
+  const columns = Math.max(minColumns, Math.min(maxColumns, Math.round(cfg.columns ?? Math.max(48, Math.min(112, pixels.width / 5)))));
   const { dotsWidth, dotsHeight, rows } = artSize(pixels.width, pixels.height, columns);
   const small = resize(pixels, dotsWidth, dotsHeight);
   const { ink, active } = signal(small, cfg.invert ?? true);
@@ -24,7 +24,7 @@ export const makeArt = (pixels: Pixels, cfg: ArtCfg = {}): Art => {
   let on = 0;
   for (const dot of dots) on += dot;
   return {
-    text: packBraille(dots, dotsWidth, dotsHeight), columns, rows, dotsWidth, dotsHeight, threshold,
+    text: packUnicode(dots, dotsWidth, dotsHeight), columns, rows, dotsWidth, dotsHeight, threshold,
     density: dots.length ? on / dots.length : 0,
     ...(coloured ? { cellColours: coloured.cells } : {})
   };
