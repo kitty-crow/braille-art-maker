@@ -24,7 +24,7 @@ The browser app supports PNG upload, live Unicode preview, dithering, monochrome
 
 The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Foreground-only colour uses the dark preview surface in light mode so the result remains visible; the adjacent `?` explains that this is a preview aid.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off. Foreground-only colour uses the dark preview surface in light mode so the result remains visible; the adjacent `?` explains that a genuinely light surface can make some colours difficult to see.
 
 Colour modes:
 
@@ -74,6 +74,8 @@ https://kitty-crow.github.io/braille-art-maker/v1/embed.js
 https://kitty-crow.github.io/braille-art-maker/v1/embed.css
 https://kitty-crow.github.io/braille-art-maker/v1/load.js
 ```
+
+With the default `data-surface="auto"`, a light-themed foreground-only colour embed deliberately uses the dark surface for readability. Background-coloured/full-colour embeds follow the light surface normally. A site author can force `data-surface="light"`, but should be aware that some foreground colours may then become difficult to see.
 
 See [Embedding](docs/embed.md).
 

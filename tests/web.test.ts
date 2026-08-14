@@ -50,6 +50,7 @@ test("foreground-only colour gets a dark light-theme preview and warning", async
   const css = await readFile(join(root, "web", "styles", "maker.css"), "utf8");
   expect(html).toContain('id="preview-contrast-info"');
   expect(html).toContain('Why the preview background is dark');
+  expect(html).toContain('embeds use the same safe default');
   expect(maker).toContain('activeTheme() === "light" && colour.checked && !colourBg.checked');
   expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", darkPreview)');
   expect(css).toContain('&[data-contrast-dark]{background:#24212b;');
@@ -113,7 +114,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.3");
+  expect(pkg.version).toBe("0.4.4");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });

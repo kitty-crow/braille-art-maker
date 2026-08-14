@@ -106,7 +106,7 @@ class View {
       this.root.replaceChildren(tpl.content.cloneNode(true));
       const frame = this.need<HTMLElement>(".frame");
       const grid = this.need<HTMLElement>("[data-unicode-art-root]");
-      const dark = this.surfaceDark();
+      const dark = this.surfaceDark(payload);
       frame.style.setProperty("--surface-bg", dark ? "#24212b" : "#eee7e5");
       frame.style.setProperty("--surface-fg", dark ? "#f4eff5" : "#201d24");
       grid.style.setProperty("--cols", String(payload.columns));
@@ -203,11 +203,12 @@ class View {
     return page === "dark" || (page !== "light" && this.media.matches);
   }
 
-  private surfaceDark(): boolean {
+  private surfaceDark(payload: EmbedPayload | null = this.payload): boolean {
     const surface = this.surface();
     if (surface === "dark") return true;
     if (surface === "light") return false;
-    return this.themeDark();
+    if (this.themeDark()) return true;
+    return payload?.colour === true && !payload.colourBackground && !payload.fullColour;
   }
 
   private need<T extends Element>(query: string): T {

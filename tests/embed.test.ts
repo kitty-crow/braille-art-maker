@@ -48,3 +48,11 @@ test("embed runtime uses shadow DOM and a 200-character geometry probe", async (
   expect(runtime).toContain('new ResizeObserver');
   expect(runtime).toContain('new MutationObserver');
 });
+
+test("auto embed surface protects foreground-only colour on light themes", async () => {
+  const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
+  expect(runtime).toContain('if (surface === "dark") return true;');
+  expect(runtime).toContain('if (surface === "light") return false;');
+  expect(runtime).toContain('if (this.themeDark()) return true;');
+  expect(runtime).toContain('payload?.colour === true && !payload.colourBackground && !payload.fullColour');
+});

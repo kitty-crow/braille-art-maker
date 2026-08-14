@@ -21,6 +21,31 @@ The maker shows a paste-ready embed div and provides **Copy embed div**. The fra
 
 The consuming site controls the size and position of the outer div. The embed runtime owns the internal geometry and colours.
 
+## Foreground-only colour on light pages
+
+A foreground-only colour image can become difficult to read on a light surface. With `data-surface="auto"`, the embed therefore uses the dark surface whenever all of these are true:
+
+- the resolved theme is light
+- colour is enabled
+- background colour is not enabled
+- full colour is not enabled
+
+This is only a presentation surface; it does not add background colours to the Unicode cells.
+
+A consuming site can deliberately opt back into a light surface:
+
+```html
+<div data-unicode-art data-surface="light" ...>
+```
+
+or through the API:
+
+```js
+UnicodeArt.mount(host, { surface: "light" })
+```
+
+The site author should only do this when the chosen foreground colours remain readable on a light background.
+
 ## CLI
 
 ```bash
@@ -43,7 +68,7 @@ Theme and surface can be controlled independently:
 --embed-surface auto|light|dark
 ```
 
-`auto` follows the consuming page or operating-system colour scheme. A consuming site may also change `data-theme` or `data-surface` on the host div after mounting; the runtime observes those attributes and rerenders.
+A consuming site may also change `data-theme` or `data-surface` on the host div after mounting; the runtime observes those attributes and rerenders.
 
 ## Runtime
 
