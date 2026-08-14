@@ -21,16 +21,16 @@ export const bindResolutionGate = (
   opts: ResolutionGateOpts = {},
 ): void => {
   const notch = opts.notch ?? 256;
-  const defaultResistance = opts.resistancePx ?? 34;
+  const resistance = opts.resistancePx ?? 34;
   const gates = [...(opts.gates ?? [
     {
       value: notch,
-      resistancePx: defaultResistance,
+      resistancePx: resistance,
       message: opts.message ?? "Resolutions above 256 cells are experimental and performance drops significantly. Keep dragging to continue.",
     },
     {
       value: 765,
-      resistancePx: defaultResistance,
+      resistancePx: resistance,
       message: "Beyond here, any-nyan ventures at their own risk. Extreme resolutions can devour memory, battery, and occasionally the tab itself.",
     },
   ])].sort((a, b) => a.value - b.value);
@@ -140,7 +140,6 @@ export const bindResolutionGate = (
         return;
       }
 
-      const resistance = active.gate.resistancePx ?? defaultResistance;
       if (event.clientX < notchX() + resistance) {
         setValue(active.gate.value);
         showTip(active.gate.message);
