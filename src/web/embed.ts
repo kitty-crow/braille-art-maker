@@ -2,6 +2,8 @@ import type { EmbedSurface, EmbedTheme } from "../embed/types.ts";
 import type { PackProgress } from "../embed/ultra-search.ts";
 import type { Art, ArtCfg } from "../types.ts";
 
+export type EmbedSource = { readonly art: Art } | { readonly artKey: string };
+
 interface Response {
   readonly id: number;
   readonly html?: string;
@@ -46,7 +48,7 @@ const getWorker = (): Worker => {
 };
 
 export const embedHtml = (
-  art: Art,
+  source: EmbedSource,
   cfg: ArtCfg,
   theme: EmbedTheme = "auto",
   surface: EmbedSurface = "auto",
@@ -54,5 +56,5 @@ export const embedHtml = (
 ): Promise<string> => new Promise((resolve, reject) => {
   const id = ++nextId;
   pending.set(id, { resolve, reject, ...(progress ? { progress } : {}) });
-  getWorker().postMessage({ id, art, cfg, theme, surface });
+  getWorker().postMessage({ id, ...source, cfg, theme, surface });
 });
