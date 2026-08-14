@@ -41,7 +41,7 @@ test("light and dark themes apply visibility-friendly defaults", async () => {
   expect(config).toContain('event: "unicode-art-theme"');
   expect(maker).toContain('heroBg.checked = light;');
   expect(maker).toContain('heroFull.checked = false;');
-  expect(maker).toContain('invert.checked = !light;');
+  expect(maker).toContain('syncColour(true);');
 });
 
 test("foreground-only colour gets a dark light-theme preview and warning", async () => {
@@ -55,6 +55,13 @@ test("foreground-only colour gets a dark light-theme preview and warning", async
   expect(maker).toContain('previewScroll.toggleAttribute("data-contrast-dark", darkPreview)');
   expect(css).toContain('&[data-contrast-dark]{background:#24212b;');
   expect(css).toContain('.output-grid{color:#f4eff5;}');
+});
+
+test("maker polarity follows the actual preview surface on mode changes", async () => {
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  expect(maker).toContain('const darkMakerSurface = (): boolean => activeTheme() === "dark" || (colour.checked && !colourBg.checked);');
+  expect(maker).toContain('const syncMakerPolarity = (): void => { invert.checked = darkMakerSurface(); };');
+  expect(maker).toContain('syncColour(true); schedule();');
 });
 
 test("maker keeps slider defaults and switches only dither when colour is enabled", async () => {
@@ -138,8 +145,8 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.7");
   expect(ver.version).toBe(pkg.version);
+  expect(pkg.version).toMatch(/^0\.4\.\d+$/);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });
 

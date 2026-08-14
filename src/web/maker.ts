@@ -46,15 +46,18 @@ export const startMaker = (): void => {
     colour: false, colourBackground: false, fullColour: false
   };
 
+  const darkMakerSurface = (): boolean => activeTheme() === "dark" || (colour.checked && !colourBg.checked);
   const syncPreviewContrast = (): void => {
     const darkPreview = activeTheme() === "light" && colour.checked && !colourBg.checked;
     previewScroll.toggleAttribute("data-contrast-dark", darkPreview);
     previewInfo.hidden = !darkPreview;
   };
-  const syncColour = (): void => {
+  const syncMakerPolarity = (): void => { invert.checked = darkMakerSurface(); };
+  const syncColour = (polarity = false): void => {
     colourBg.disabled = !colour.checked;
     fullColour.disabled = !colour.checked || !colourBg.checked;
     syncPreviewContrast();
+    if (polarity) syncMakerPolarity();
   };
   const syncHeroColour = (): void => {
     heroBg.disabled = !heroColour.checked;
@@ -84,9 +87,8 @@ export const startMaker = (): void => {
     const light = theme === "light";
     heroBg.checked = light;
     heroFull.checked = false;
-    invert.checked = !light;
     syncHeroColour();
-    syncPreviewContrast();
+    syncColour(true);
     if (heroPixels) generateHero();
     if (vector) generateMaker();
   };
@@ -118,9 +120,9 @@ export const startMaker = (): void => {
   colour.addEventListener("change", () => {
     dither.value = colour.checked ? "atkinson" : "ordered";
     if (colour.checked) { colourBg.checked = false; fullColour.checked = false; }
-    syncColour(); schedule();
+    syncColour(true); schedule();
   });
-  for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(); schedule(); });
+  for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(true); schedule(); });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   columns.addEventListener("input", () => { columnsOut.value = columns.value; });
   addEventListener("unicode-art-theme", event => {
