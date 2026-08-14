@@ -1,0 +1,16 @@
+{
+  "name": "@kitty-crow/unicode-art-maker",
+  "version": "0.2.0",
+  "description": "PNG to dense Unicode art for Bun and the browser.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Kitty Crow <kitty@kittycrow.dev> (https://kittycrow.dev)",
+  "repository": "github:kitty-crow/braille-art-maker",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "check": "bunx tsc --noEmit && bun run test",
+    "test": "bun test tests/core.test.ts tests/colour.test.ts tests/vector.test.ts"
+  },
+  "devDependencies": { "@types/bun": "1.3.14", "typescript": "5.9.3" },
+  "engines": { "bun": ">=1.3.14" }
+}
