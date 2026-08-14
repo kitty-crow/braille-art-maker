@@ -45,6 +45,8 @@ export const bindResolutionGate = (
     return Math.round(min + ratio * (max - min));
   };
 
+  const notchX = (): number => gateX ?? pointerX;
+
   const setValue = (value: number): boolean => {
     const next = String(value);
     if (input.value === next) { output.value = next; return false; }
@@ -82,7 +84,7 @@ export const bindResolutionGate = (
       return;
     }
 
-    if (event.clientX < gateX + resistance) {
+    if (event.clientX < notchX() + resistance) {
       setValue(notch);
       showTip();
       return;
