@@ -11,6 +11,14 @@ import { download } from "./download.ts";
 import { decodeImage } from "./image.ts";
 import { bindTooltips } from "./tooltips.ts";
 
+type Theme = "light" | "dark";
+
+const activeTheme = (): Theme => {
+  const value = document.documentElement.dataset.theme;
+  if (value === "light" || value === "dark") return value;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
 export const startMaker = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroBg = qs<HTMLInputElement>("#hero-background"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
@@ -59,6 +67,16 @@ export const startMaker = (): void => {
     renderDense(heroUnicode, next);
   };
 
+  const applyThemeDefaults = (theme: Theme): void => {
+    const light = theme === "light";
+    heroBg.checked = light;
+    heroFull.checked = false;
+    invert.checked = !light;
+    syncHeroColour();
+    if (heroPixels) generateHero();
+    if (vector) generateMaker();
+  };
+
   const loadMaker = async (source: Blob | string, nextName: string, seedHero = false): Promise<void> => {
     const local = ++loadGeneration;
     setStatus("Reading image…", true);
@@ -91,6 +109,10 @@ export const startMaker = (): void => {
   for (const control of [colourBg, fullColour]) control.addEventListener("change", () => { syncColour(); schedule(); });
   for (const control of [heroColour, heroBg, heroFull]) control.addEventListener("change", () => { syncHeroColour(); generateHero(); });
   columns.addEventListener("input", () => { columnsOut.value = columns.value; });
+  addEventListener("unicode-art-theme", event => {
+    const theme = (event as CustomEvent<Theme>).detail;
+    if (theme === "light" || theme === "dark") applyThemeDefaults(theme);
+  });
 
   upload.addEventListener("change", () => { const file = upload.files?.[0]; if (file) void loadMaker(file, file.name.replace(/\.[^.]+$/, "")); });
   drop.addEventListener("dragover", event => { event.preventDefault(); drop.dataset.drag = "true"; });
@@ -108,6 +130,7 @@ export const startMaker = (): void => {
   const observer = new ResizeObserver(() => { fitDense(heroUnicode); fitDense(output); });
   observer.observe(compare);
   if (output.parentElement) observer.observe(output.parentElement);
-  syncColour(); syncHeroColour();
+  syncColour();
+  applyThemeDefaults(activeTheme());
   void loadMaker("assets/hero.png", "hero", true);
 };

@@ -20,7 +20,8 @@ export default definePages({
       key: "unicode-art-maker.theme",
       colours: { light: "#f7f3f1", dark: "#111016" },
       toggle: "[data-theme-toggle]",
-      label: "[data-theme-label]"
+      label: "[data-theme-label]",
+      event: "unicode-art-theme"
     },
     kofi: {
       user: "kittycrow",

@@ -22,9 +22,9 @@ Open `http://localhost:4173`.
 
 The browser app supports PNG upload, live Unicode preview, dithering, monochrome or colour output, TXT/HTML/SVG downloads and a draggable PNG/Unicode hero comparison.
 
-The hero starts in foreground-only colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
+The hero starts in colour at 240 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. In light mode background colour starts on; in dark mode it starts off. Full colour starts off in both themes. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off.
+The maker starts monochrome at the original slider defaults with Ordered 4x4. In light mode Invert image polarity starts off; in dark mode it starts on. Enabling colour keeps those slider values, switches the dither control to Atkinson and starts with background/full colour off.
 
 Colour modes:
 

@@ -12,23 +12,38 @@ test("hero starts at a vertical 50 percent split", async () => {
   expect(css).toContain("top:0;"); expect(css).toContain("bottom:0;"); expect(css).toContain("left:var(--split);"); expect(css).toContain("clip-path:inset(0 0 0 var(--split));");
 });
 
-test("ordered dithering and inverted polarity are the monochrome defaults", async () => {
+test("ordered dithering and inverted polarity remain core and CLI defaults", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const art = await readFile(join(root, "src", "core", "art.ts"), "utf8");
   const args = await readFile(join(root, "src", "cli", "args.ts"), "utf8");
-  expect(html).toContain('<option value="ordered" selected>'); expect(html).toContain('id="invert" type="checkbox" checked');
+  expect(html).toContain('<option value="ordered" selected>');
   expect(art).toContain('cfg.invert ?? true'); expect(art).toContain('cfg.dither ?? "ordered"');
   expect(args).toContain('value("--dither") ?? "ordered"'); expect(args).toContain('!args.includes("--no-invert")');
 });
 
-test("hero uses detailed foreground-only colour and restores monochrome defaults", async () => {
+test("hero uses detailed colour and restores monochrome defaults", async () => {
   const html = await readFile(join(root, "web", "index.html"), "utf8");
   const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
   expect(html).toContain('id="hero-colour" type="checkbox" checked');
-  expect(html).toContain('id="hero-background" type="checkbox">');
-  expect(html).toContain('id="hero-full-colour" type="checkbox" disabled>');
+  expect(html).toContain('id="hero-background" type="checkbox" checked');
+  expect(html).toContain('id="hero-full-colour" type="checkbox">');
   expect(maker).toContain('columns: maxColumns, contrast: 0.55, detail: 1.2, bias: 0.25, dither: "atkinson"');
   expect(maker).toContain('columns: 96, contrast: 1.12, detail: 0.34, bias: 0.015, dither: "ordered"');
+});
+
+test("light and dark themes apply visibility-friendly defaults", async () => {
+  const html = await readFile(join(root, "web", "index.html"), "utf8");
+  const maker = await readFile(join(root, "src", "web", "maker.ts"), "utf8");
+  const config = await readFile(join(root, "pages.config.ts"), "utf8");
+  expect(html).toContain('id="hero-background" type="checkbox" checked');
+  expect(html).toContain('id="invert" type="checkbox"> Invert image polarity');
+  expect(html).not.toContain('id="invert" type="checkbox" checked');
+  expect(config).toContain('event: "unicode-art-theme"');
+  expect(maker).toContain('heroBg.checked = light;');
+  expect(maker).toContain('heroFull.checked = false;');
+  expect(maker).toContain('invert.checked = !light;');
+  expect(maker).toContain('addEventListener("unicode-art-theme"');
+  expect(maker).toContain('applyThemeDefaults(activeTheme());');
 });
 
 test("maker keeps slider defaults and switches only dither when colour is enabled", async () => {
@@ -77,7 +92,7 @@ test("logo and favicon are wired into the site", async () => {
 test("project version metadata stays in sync", async () => {
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string; name: string };
   const ver = JSON.parse(await readFile(join(root, "version.json"), "utf8")) as { version: string };
-  expect(pkg.version).toBe("0.4.0");
+  expect(pkg.version).toBe("0.4.1");
   expect(ver.version).toBe(pkg.version);
   expect(pkg.name).toBe("@kitty-crow/unicode-art-maker");
 });
