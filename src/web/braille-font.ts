@@ -18,9 +18,14 @@ const families = [
 
 const probe = (host: HTMLElement, family: string, fontPx: number, text: string): HTMLSpanElement => {
   const span = document.createElement("span");
-  span.className = "unicode-probe";
+  span.style.position = "absolute";
+  span.style.visibility = "hidden";
+  span.style.pointerEvents = "none";
+  span.style.whiteSpace = "pre";
   span.style.fontFamily = family;
   span.style.fontSize = `${fontPx}px`;
+  span.style.fontWeight = "400";
+  span.style.fontSynthesis = "none";
   span.style.fontKerning = "none";
   span.style.fontVariantLigatures = "none";
   span.style.letterSpacing = "0";
