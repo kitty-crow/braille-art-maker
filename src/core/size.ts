@@ -5,7 +5,7 @@ export interface ArtSize {
 }
 
 export const minColumns = 8;
-export const maxColumns = 4096;
+export const maxColumns = 2048;
 
 export const artSize = (width: number, height: number, columns = 96): ArtSize => {
   const cols = Math.max(minColumns, Math.min(maxColumns, Math.round(columns)));
