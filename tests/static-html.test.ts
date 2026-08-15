@@ -110,6 +110,11 @@ test("embed code view uses streamed static artifacts, bounded Marked preview and
   expect(view).toContain('this.tab("No JavaScript", "static", false)');
   expect(view).toContain("makeStaticArtifact(decoded)");
   expect(view).toContain("Preview truncated in the maker");
+  expect(view).toContain("private renderStaticPreview(artifact: StaticArtifact): void");
+  expect(view).toContain("void this.marked(source, generation);");
+  expect(view).toContain("this.renderStaticPreview(this.staticArtifact);");
+  expect(view).toContain("if (this.mode === \"static\") this.renderStaticPreview(artifact);");
+  expect(view).not.toContain("this.renderCode(this.staticPreview(");
   expect(view).toContain('new ClipboardItem({ "text/plain": artifact.blob })');
   expect(view).toContain("safeTextFallbackBytes");
   expect(view).toContain("Building self-contained HTML…");
