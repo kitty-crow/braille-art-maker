@@ -243,9 +243,9 @@ test("project version and package metadata stay in sync", async () => {
   const pkg = JSON.parse(await read("package.json")) as { version: string; name: string; repository: string };
   const ver = JSON.parse(await read("version.json")) as { version: string };
   expect(ver.version).toBe(pkg.version);
-  expect(pkg.version).toBe("0.4.36");
+  expect(pkg.version).toBe("0.4.37");
   expect(pkg.name).toBe("@kitty-crow/unicode-art-studio");
-  expect(pkg.repository).toBe("github:kitty-crow/braille-art-maker");
+  expect(pkg.repository).toBe("github:kitty-crow/unicode-art-studio");
 });
 
 test("styles are split by concern and Studio stylesheet is canonical", async () => {
@@ -263,7 +263,7 @@ test("README uses the shared markdown runtime and Ko-fi integration", async () =
   const html = await read("web/readme/index.html");
   expect(config).toContain('files: ["kofi.css"]');
   expect(config).toContain('user: "kittycrow"');
-  expect(config).toContain('repo: "braille-art-maker"');
+  expect(config).toContain('repo: "unicode-art-studio"');
   expect(html).toContain('id="readme-content" class="panel markdown"');
   expect(html).toContain('id="readme-status" class="sr-only"');
 });
