@@ -41,7 +41,7 @@ test("current story transport is the authentic Aozora v3 corpus", () => {
 
 test("every active story sentence has explicit public-domain provenance", () => {
   expect(authenticJapaneseSentences).toHaveLength(64);
-  const sourceIds = new Set(authenticJapaneseSources.map(source => source.id));
+  const sourceIds = new Set<string>(authenticJapaneseSources.map(source => source.id));
   expect(sourceIds.size).toBe(authenticJapaneseSources.length);
   for (const source of authenticJapaneseSources) {
     expect(source.status).toBe("public-domain");
@@ -57,9 +57,9 @@ test("every active story sentence has explicit public-domain provenance", () => 
 });
 
 test("synthetic v1 and v2 tables are frozen for decoding, not active encoding", () => {
-  const v1 = new Set(originalLnCorpusV1.entries.map(entry => entry.text));
-  const v2 = new Set(originalLnCorpusV2.entries.map(entry => entry.text));
-  const active = new Set(authenticJapaneseSentences.map(entry => entry.text));
+  const v1 = new Set<string>(originalLnCorpusV1.entries.map(entry => entry.text));
+  const v2 = new Set<string>(originalLnCorpusV2.entries.map(entry => entry.text));
+  const active = new Set<string>(authenticJapaneseSentences.map(entry => entry.text));
   for (const text of [
     "人前が苦手な魔術師",
     "王立魔術学院",
