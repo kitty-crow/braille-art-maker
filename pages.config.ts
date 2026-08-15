@@ -15,7 +15,7 @@ export default definePages({
     files: ["kofi.css"]
   },
   runtime: {
-    base: "/braille-art-maker/",
+    base: "/unicode-art-studio/",
     theme: {
       key: "unicode-art-studio.theme",
       colours: { light: "#f7f3f1", dark: "#111016" },
@@ -42,7 +42,7 @@ export default definePages({
     },
     readme: {
       owner: "kitty-crow",
-      repo: "braille-art-maker",
+      repo: "unicode-art-studio",
       branch: "main",
       path: "README.md",
       content: "#readme-content",
