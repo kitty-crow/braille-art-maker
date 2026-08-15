@@ -18,7 +18,7 @@ const colourStyle = (colour?: CellColour): string => {
     .join(";");
 };
 
-const rowsWithColour = (art: Art, fallbackCell: number, cellH: string, fontSize: string): string => {
+const rowsWithColour = (art: Art, fitCells: number, fallbackCell: number, cellH: string, fontSize: string): string => {
   const lines = art.text.split("\n");
   let at = 0;
   return lines.map(line => {
@@ -32,14 +32,15 @@ const rowsWithColour = (art: Art, fallbackCell: number, cellH: string, fontSize:
       const count = end - start;
       const text = esc(chars.slice(start, end).join(""));
       const fallbackWidth = `${(count * fallbackCell).toFixed(4)}px`;
-      const width = `${(count * 100 / art.columns).toFixed(8)}cqw`;
+      const width = `${(count * 100 / fitCells).toFixed(8)}cqw`;
       const fallbackHeight = `${(fallbackCell * 2).toFixed(4)}px`;
       runs.push(`<span style="display:inline-block;width:${fallbackWidth};width:${width};height:${fallbackHeight};height:${cellH};line-height:${fallbackHeight};line-height:${cellH};font-size:${fontSize};white-space:pre;overflow:visible;vertical-align:top;${style}">${text}</span>`);
       start = end;
     }
     at += art.columns;
     const fallbackHeight = `${(fallbackCell * 2).toFixed(4)}px`;
-    return `<div style="width:${(art.columns * fallbackCell).toFixed(4)}px;width:100cqw;height:${fallbackHeight};height:${cellH};line-height:${fallbackHeight};line-height:${cellH};white-space:nowrap;overflow:visible">${runs.join("")}</div>`;
+    const rowWidth = `${(art.columns * 100 / fitCells).toFixed(8)}cqw`;
+    return `<div style="width:${(art.columns * fallbackCell).toFixed(4)}px;width:${rowWidth};height:${fallbackHeight};height:${cellH};line-height:${fallbackHeight};line-height:${cellH};white-space:nowrap;overflow:visible">${runs.join("")}</div>`;
   }).join("");
 };
 
@@ -51,12 +52,17 @@ const rowsWithColour = (art: Art, fallbackCell: number, cellH: string, fontSize:
  */
 export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => {
   const columns = Math.max(1, art.columns);
-  const fallbackCell = 640 / columns;
-  const cellH = `${(200 / columns).toFixed(8)}cqw`;
-  const fontSize = `${(160 / columns).toFixed(8)}cqw`;
+  const rows = Math.max(1, art.rows);
+  // Compact fits a square host against both width/columns and height/(rows*2).
+  // Express that same constraint in CSS-only form by treating the limiting square axis as
+  // max(columns, rows*2) logical cell widths.
+  const fitCells = Math.max(columns, rows * 2);
+  const fallbackCell = 640 / fitCells;
+  const cellH = `${(200 / fitCells).toFixed(8)}cqw`;
+  const fontSize = `${(160 / fitCells).toFixed(8)}cqw`;
   const foregroundOnly = cfg.colour === true && cfg.fullColour !== true;
   const surface = foregroundOnly ? "background:#24212b;color:#f4eff5" : "background:Canvas;color:CanvasText;color-scheme:light dark";
-  const outer = `display:block;width:min(100%,40rem);container-type:inline-size;overflow:auto;${surface}`;
+  const outer = `display:grid;place-items:center;width:min(100%,40rem);aspect-ratio:1;container-type:inline-size;overflow:hidden;${surface}`;
   const common = `margin:0;font-family:${fonts};font-weight:400;font-synthesis:none;font-variant-ligatures:none;letter-spacing:0;text-rendering:geometricPrecision`;
 
   if (!art.cellColours) {
@@ -66,5 +72,6 @@ export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => {
   }
 
   const fallbackGrid = `font-size:${(fallbackCell * 1.6).toFixed(4)}px;line-height:${(fallbackCell * 2).toFixed(4)}px`;
-  return `<div role="img" aria-label="Generated Unicode art" style="${outer}"><div style="${common};${fallbackGrid};font-size:${fontSize};line-height:${cellH};width:${(columns * fallbackCell).toFixed(4)}px;width:100cqw;overflow:visible">${rowsWithColour(art, fallbackCell, cellH, fontSize)}</div></div>`;
+  const gridWidth = `${(columns * 100 / fitCells).toFixed(8)}cqw`;
+  return `<div role="img" aria-label="Generated Unicode art" style="${outer}"><div style="${common};${fallbackGrid};font-size:${fontSize};line-height:${cellH};width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};overflow:visible">${rowsWithColour(art, fitCells, fallbackCell, cellH, fontSize)}</div></div>`;
 };
