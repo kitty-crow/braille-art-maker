@@ -31,8 +31,8 @@ test("huge compact embeds highlight only the shell and splice the payload back a
   const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
   expect(view).toContain("const richHighlightLimit = 96_000;");
   expect(view).toContain("maskCompactPayload(source)");
-  expect(view).toContain("restoreMaskedPayload(this.host, masked)");
-  expect(view).toContain('payload.className = "hljs-string"');
+  expect(view).toContain("restoreMaskedSource(this.host, masked)");
+  expect(view).toContain('className: "hljs-string"');
   expect(view).not.toContain("finishCacheRestore(__WEB_VERSION__);");
 });
 
