@@ -154,6 +154,9 @@ test("studio packs paste-ready embeds in a dedicated worker with selectable payl
   const studio = await read("src/web/studio.ts");
   const view = await read("src/web/embed-view.ts");
   const css = await read("web/styles/studio.css");
+  const placement = await read("src/web/embed-copy-placement.ts");
+  const placementCss = await read("web/styles/embed-copy.css");
+  const entry = await read("src/web.ts");
   const webEmbed = await read("src/web/embed.ts");
   const worker = await read("src/web/embed-worker.ts");
   expect(html).toContain('id="copy-embed" class="button copy-button"');
@@ -173,6 +176,16 @@ test("studio packs paste-ready embeds in a dedicated worker with selectable payl
   expect(view).toContain('this.showCopySuccess(button);');
   expect(css).toContain('&[data-copy-state="success"] .copy-button__copy');
   expect(css).toContain('&[data-copy-state="success"] .copy-button__check');
+  expect(entry.indexOf("startStudio();")).toBeLessThan(entry.indexOf("placeEmbedCopy();"));
+  expect(placement).toContain('shell.className = "embed-code-shell"');
+  expect(placement).toContain("host.before(shell);");
+  expect(placement).toContain("shell.append(host, button);");
+  expect(placement).toContain('button.classList.add("embed-copy-button")');
+  expect(placementCss).toContain(".embed-code-shell{position:relative");
+  expect(placementCss).toContain(".embed-copy-button{position:absolute");
+  expect(placementCss).toContain("top:8px;right:8px");
+  expect(placementCss).toContain("padding-right:52px");
+  expect(placementCss).toContain('.embed-copy-button[data-copy-state="success"]');
   expect(webEmbed).toContain('const workerUrl = new URL("embed-worker.js", import.meta.url);');
   expect(webEmbed).toContain('getWorker().postMessage({ id, art, cfg, theme, surface, story });');
   expect(webEmbed).toContain('getWorker().postMessage({ id, raw, cfg, theme, surface, story }, [raw.buffer as ArrayBuffer]);');
@@ -254,7 +267,7 @@ test("project version and package metadata stay in sync", async () => {
   const pkg = JSON.parse(await read("package.json")) as { version: string; name: string; repository: string; homepage: string };
   const ver = JSON.parse(await read("version.json")) as { version: string };
   expect(ver.version).toBe(pkg.version);
-  expect(pkg.version).toBe("0.4.37");
+  expect(pkg.version).toBe("0.4.38");
   expect(pkg.name).toBe("@kitty-crow/unicode-art-studio");
   expect(pkg.repository).toBe("github:kitty-crow/unicode-art-studio");
   expect(pkg.homepage).toBe("https://kitty-crow.github.io/unicode-art-studio/");
@@ -265,6 +278,7 @@ test("styles are split by concern and Studio stylesheet is canonical", async () 
   const hero = await read("web/styles/hero.css");
   expect(index).toContain('@import url("./styles/studio.css");');
   expect(index).not.toContain('styles/maker.css');
+  expect(index).toContain('@import url("./styles/embed-copy.css");');
   expect(index).toContain('@import url("./styles/unicode.css");');
   expect(hero).toContain("2.7rem");
   expect(hero).not.toContain("3.35rem");

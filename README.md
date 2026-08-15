@@ -82,7 +82,7 @@ The CLI does not impose the browser slider's 2048-cell ceiling. Very large resol
 
 The studio's **Copy embed** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal small runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal small runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch. The copy icon sits in the top-right of the embed code box, copies whichever tab is selected, and changes to a checkmark after a successful clipboard write before returning to the copy icon. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
 
 ### Compact payload modes
 
