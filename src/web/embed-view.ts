@@ -106,7 +106,13 @@ const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean
 
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const envelope = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]')?.textContent?.trim() ?? "";
+  const script = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]');
+  const envelope = script?.textContent?.trim() ?? "";
+  const explicit = script?.dataset.codec;
+  if (explicit === "u1" || explicit === "u2" || explicit === "u3" || explicit === "u4") {
+    if (!envelope) throw new Error("Compact embed payload is empty.");
+    return { codec: explicit, data: envelope };
+  }
   const digit = envelope[0];
   if (digit !== "1" && digit !== "2" && digit !== "3" && digit !== "4") throw new Error("Compact embed payload is missing its codec marker.");
   if (envelope.length < 2) throw new Error("Compact embed payload is empty.");

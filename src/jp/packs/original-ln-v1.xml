@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<corpus id="original-ln-v1" version="1">
+  <entry id="person-001" kind="person">薬師の少女</entry>
+  <entry id="person-002" kind="person">若い司書</entry>
+  <entry id="person-003" kind="person">旅の魔術師</entry>
+  <entry id="person-004" kind="person">静かな仕立て屋</entry>
+  <entry id="person-005" kind="person">宮廷の侍女</entry>
+  <entry id="person-006" kind="person">眠そうな学者</entry>
+  <entry id="person-007" kind="person">町の医師</entry>
+  <entry id="person-008" kind="person">見習い錬金術師</entry>
+  <entry id="person-009" kind="person">古書店の娘</entry>
+  <entry id="person-010" kind="person">庭師の青年</entry>
+  <entry id="person-011" kind="person">無口な護衛</entry>
+  <entry id="person-012" kind="person">迷子の令嬢</entry>
+  <entry id="person-013" kind="person">気難しい先生</entry>
+  <entry id="person-014" kind="person">小さな魔女</entry>
+  <entry id="person-015" kind="person">遠国の使者</entry>
+  <entry id="person-016" kind="person">書庫番</entry>
+  <entry id="person-017" kind="person">薬草売り</entry>
+  <entry id="person-018" kind="person">時計職人</entry>
+  <entry id="person-019" kind="person">宮廷絵師</entry>
+  <entry id="person-020" kind="person">占い師</entry>
+  <entry id="person-021" kind="person">料理人</entry>
+  <entry id="person-022" kind="person">神殿の巫女</entry>
+  <entry id="person-023" kind="person">港町の少女</entry>
+  <entry id="person-024" kind="person">宿屋の主人</entry>
+  <entry id="person-025" kind="person">若い騎士</entry>
+  <entry id="person-026" kind="person">森の番人</entry>
+  <entry id="person-027" kind="person">旅する詩人</entry>
+  <entry id="person-028" kind="person">王宮の書記</entry>
+  <entry id="person-029" kind="person">猫好きの研究者</entry>
+  <entry id="person-030" kind="person">雨宿りをしている娘</entry>
+  <entry id="noun-001" kind="noun">夜</entry>
+  <entry id="noun-002" kind="noun">朝</entry>
+  <entry id="noun-003" kind="noun">雨</entry>
+  <entry id="noun-004" kind="noun">風</entry>
+  <entry id="noun-005" kind="noun">月あかり</entry>
+  <entry id="noun-006" kind="noun">秘密</entry>
+  <entry id="noun-007" kind="noun">噂</entry>
+  <entry id="noun-008" kind="noun">約束</entry>
+  <entry id="noun-009" kind="noun">記憶</entry>
+  <entry id="noun-010" kind="noun">夢</entry>
+  <entry id="noun-011" kind="noun">季節</entry>
+  <entry id="noun-012" kind="noun">運命</entry>
+  <entry id="noun-013" kind="noun">沈黙</entry>
+  <entry id="noun-014" kind="noun">気配</entry>
+  <entry id="noun-015" kind="noun">ため息</entry>
+  <entry id="noun-016" kind="noun">笑い声</entry>
+  <entry id="noun-017" kind="noun">足音</entry>
+  <entry id="noun-018" kind="noun">手紙</entry>
+  <entry id="noun-019" kind="noun">物語</entry>
+  <entry id="noun-020" kind="noun">謎</entry>
+  <entry id="place-001" kind="place">薬草園</entry>
+  <entry id="place-002" kind="place">古い図書室</entry>
+  <entry id="place-003" kind="place">雨の中庭</entry>
+  <entry id="place-004" kind="place">静かな廊下</entry>
+  <entry id="place-005" kind="place">城下町</entry>
+  <entry id="place-006" kind="place">小さな診療所</entry>
+  <entry id="place-007" kind="place">宮廷の厨房</entry>
+  <entry id="place-008" kind="place">北の塔</entry>
+  <entry id="place-009" kind="place">古書店</entry>
+  <entry id="place-010" kind="place">温室</entry>
+  <entry id="place-011" kind="place">港の倉庫</entry>
+  <entry id="place-012" kind="place">森の小径</entry>
+  <entry id="place-013" kind="place">離れの部屋</entry>
+  <entry id="place-014" kind="place">学舎</entry>
+  <entry id="place-015" kind="place">市場</entry>
+  <entry id="place-016" kind="place">神殿</entry>
+  <entry id="place-017" kind="place">川辺</entry>
+  <entry id="place-018" kind="place">屋根裏</entry>
+  <entry id="place-019" kind="place">月の見える庭</entry>
+  <entry id="place-020" kind="place">地下書庫</entry>
+  <entry id="place-021" kind="place">客間</entry>
+  <entry id="place-022" kind="place">工房</entry>
+  <entry id="place-023" kind="place">駅前</entry>
+  <entry id="place-024" kind="place">茶屋</entry>
+  <entry id="object-001" kind="object">青い薬瓶</entry>
+  <entry id="object-002" kind="object">古びた本</entry>
+  <entry id="object-003" kind="object">銀の鍵</entry>
+  <entry id="object-004" kind="object">乾いた薬草</entry>
+  <entry id="object-005" kind="object">小さな手鏡</entry>
+  <entry id="object-006" kind="object">封をされた手紙</entry>
+  <entry id="object-007" kind="object">白い花</entry>
+  <entry id="object-008" kind="object">赤い糸</entry>
+  <entry id="object-009" kind="object">壊れた時計</entry>
+  <entry id="object-010" kind="object">湯気の立つ茶碗</entry>
+  <entry id="object-011" kind="object">黒い羽根</entry>
+  <entry id="object-012" kind="object">薄い帳面</entry>
+  <entry id="object-013" kind="object">木箱</entry>
+  <entry id="object-014" kind="object">星図</entry>
+  <entry id="object-015" kind="object">髪飾り</entry>
+  <entry id="object-016" kind="object">刺繍の布</entry>
+  <entry id="object-017" kind="object">忘れられた靴</entry>
+  <entry id="object-018" kind="object">古い地図</entry>
+  <entry id="object-019" kind="object">香炉</entry>
+  <entry id="object-020" kind="object">ガラス玉</entry>
+  <entry id="object-021" kind="object">薬包</entry>
+  <entry id="object-022" kind="object">砂糖菓子</entry>
+  <entry id="object-023" kind="object">羽根ペン</entry>
+  <entry id="object-024" kind="object">指輪</entry>
+  <entry id="object-025" kind="object">硝子の小瓶</entry>
+  <entry id="object-026" kind="object">木の櫛</entry>
+  <entry id="object-027" kind="object">蝋燭</entry>
+  <entry id="object-028" kind="object">猫の鈴</entry>
+  <entry id="object-029" kind="object">紙袋</entry>
+  <entry id="object-030" kind="object">包帯</entry>
+  <entry id="object-031" kind="object">古い写真</entry>
+  <entry id="object-032" kind="object">手袋</entry>
+  <entry id="object-033" kind="object">薬匙</entry>
+  <entry id="object-034" kind="object">しおり</entry>
+  <entry id="object-035" kind="object">銅貨</entry>
+  <entry id="object-036" kind="object">絵筆</entry>
+  <entry id="object-037" kind="object">乾いたパン</entry>
+  <entry id="object-038" kind="object">小さな魔法陣</entry>
+  <entry id="adjective-001" kind="adjective">静か|na</entry>
+  <entry id="adjective-002" kind="adjective">不思議|na</entry>
+  <entry id="adjective-003" kind="adjective">奇妙|na</entry>
+  <entry id="adjective-004" kind="adjective">ひそやか|na</entry>
+  <entry id="adjective-005" kind="adjective">大切|na</entry>
+  <entry id="adjective-006" kind="adjective">曖昧|na</entry>
+  <entry id="adjective-007" kind="adjective">穏やか|na</entry>
+  <entry id="adjective-008" kind="adjective">妙|na</entry>
+  <entry id="adjective-009" kind="adjective">古い|i</entry>
+  <entry id="adjective-010" kind="adjective">青い|i</entry>
+  <entry id="adjective-011" kind="adjective">白い|i</entry>
+  <entry id="adjective-012" kind="adjective">赤い|i</entry>
+  <entry id="adjective-013" kind="adjective">冷たい|i</entry>
+  <entry id="adjective-014" kind="adjective">甘い|i</entry>
+  <entry id="adjective-015" kind="adjective">小さい|i</entry>
+  <entry id="adjective-016" kind="adjective">長い|i</entry>
+  <entry id="adjective-017" kind="adjective">重い|i</entry>
+  <entry id="adjective-018" kind="adjective">薄暗い|i</entry>
+  <entry id="adjective-019" kind="adjective">懐かしい|i</entry>
+  <entry id="adjective-020" kind="adjective">怪しい|i</entry>
+  <entry id="verb-001" kind="verb" tags="transitive">調べる|調べた|調べている</entry>
+  <entry id="verb-002" kind="verb" tags="transitive">見つける|見つけた|見つけている</entry>
+  <entry id="verb-003" kind="verb" tags="transitive">隠す|隠した|隠している</entry>
+  <entry id="verb-004" kind="verb" tags="transitive">忘れる|忘れた|忘れている</entry>
+  <entry id="verb-005" kind="verb" tags="transitive">拾う|拾った|拾っている</entry>
+  <entry id="verb-006" kind="verb" tags="transitive">読む|読んだ|読んでいる</entry>
+  <entry id="verb-007" kind="verb" tags="transitive">運ぶ|運んだ|運んでいる</entry>
+  <entry id="verb-008" kind="verb" tags="transitive">確かめる|確かめた|確かめている</entry>
+  <entry id="verb-009" kind="verb" tags="transitive">数える|数えた|数えている</entry>
+  <entry id="verb-010" kind="verb" tags="transitive">眺める|眺めた|眺めている</entry>
+  <entry id="verb-011" kind="verb" tags="transitive">包む|包んだ|包んでいる</entry>
+  <entry id="verb-012" kind="verb" tags="transitive">磨く|磨いた|磨いている</entry>
+  <entry id="verb-013" kind="verb" tags="transitive">預かる|預かった|預かっている</entry>
+  <entry id="verb-014" kind="verb" tags="transitive">疑う|疑った|疑っている</entry>
+  <entry id="verb-015" kind="verb" tags="transitive">守る|守った|守っている</entry>
+  <entry id="verb-016" kind="verb" tags="transitive">なくす|なくした|なくしている</entry>
+  <entry id="verb-017" kind="verb" tags="transitive">交換する|交換した|交換している</entry>
+  <entry id="verb-018" kind="verb" tags="transitive">描く|描いた|描いている</entry>
+  <entry id="verb-019" kind="verb" tags="transitive">測る|測った|測っている</entry>
+  <entry id="verb-020" kind="verb" tags="transitive">温める|温めた|温めている</entry>
+  <entry id="verb-021" kind="verb" tags="motion">向かう|向かった|向かっている</entry>
+  <entry id="verb-022" kind="verb" tags="motion">帰る|帰った|帰っている</entry>
+  <entry id="verb-023" kind="verb" tags="motion">歩く|歩いた|歩いている</entry>
+  <entry id="verb-024" kind="verb" tags="motion">急ぐ|急いだ|急いでいる</entry>
+  <entry id="verb-025" kind="verb" tags="motion">迷い込む|迷い込んだ|迷い込んでいる</entry>
+  <entry id="verb-026" kind="verb" tags="motion">忍び込む|忍び込んだ|忍び込んでいる</entry>
+  <entry id="verb-027" kind="verb" tags="motion">戻る|戻った|戻っている</entry>
+  <entry id="verb-028" kind="verb" tags="motion">出かける|出かけた|出かけている</entry>
+  <entry id="verb-029" kind="verb" tags="intransitive">眠る|眠った|眠っている</entry>
+  <entry id="verb-030" kind="verb" tags="intransitive">笑う|笑った|笑っている</entry>
+  <entry id="verb-031" kind="verb" tags="intransitive">立ち止まる|立ち止まった|立ち止まっている</entry>
+  <entry id="verb-032" kind="verb" tags="intransitive">消える|消えた|消えている</entry>
+  <entry id="verb-033" kind="verb" tags="intransitive">待つ|待った|待っている</entry>
+  <entry id="verb-034" kind="verb" tags="intransitive">考え込む|考え込んだ|考え込んでいる</entry>
+  <entry id="verb-035" kind="verb" tags="intransitive">黙る|黙った|黙っている</entry>
+  <entry id="verb-036" kind="verb" tags="intransitive">驚く|驚いた|驚いている</entry>
+  <entry id="verb-037" kind="verb" tags="intransitive">ため息をつく|ため息をついた|ため息をついている</entry>
+  <entry id="verb-038" kind="verb" tags="intransitive">目を覚ます|目を覚ました|目を覚ましている</entry>
+  <entry id="connector-001" kind="connector">しかし</entry>
+  <entry id="connector-002" kind="connector">それでも</entry>
+  <entry id="connector-003" kind="connector">ところが</entry>
+  <entry id="connector-004" kind="connector">そのころ</entry>
+  <entry id="connector-005" kind="connector">なぜか</entry>
+  <entry id="connector-006" kind="connector">やがて</entry>
+  <entry id="connector-007" kind="connector">しばらくして</entry>
+  <entry id="connector-008" kind="connector">その一方で</entry>
+  <entry id="connector-009" kind="connector">どういうわけか</entry>
+  <entry id="connector-010" kind="connector">すると</entry>
+  <entry id="connector-011" kind="connector">けれども</entry>
+  <entry id="connector-012" kind="connector">結局</entry>
+  <entry id="dialogue-001" kind="dialogue">それは薬ではありません</entry>
+  <entry id="dialogue-002" kind="dialogue">本当にそう思いますか</entry>
+  <entry id="dialogue-003" kind="dialogue">私は何も知りません</entry>
+  <entry id="dialogue-004" kind="dialogue">その本を返してください</entry>
+  <entry id="dialogue-005" kind="dialogue">今日はもう遅いですよ</entry>
+  <entry id="dialogue-006" kind="dialogue">どうしてここにいるのですか</entry>
+  <entry id="dialogue-007" kind="dialogue">少しだけ待ってください</entry>
+  <entry id="dialogue-008" kind="dialogue">その話は初めて聞きました</entry>
+  <entry id="dialogue-009" kind="dialogue">これは誰の忘れ物でしょう</entry>
+  <entry id="dialogue-010" kind="dialogue">たぶん気のせいです</entry>
+  <entry id="dialogue-011" kind="dialogue">その匂いには覚えがあります</entry>
+  <entry id="dialogue-012" kind="dialogue">今は触らないほうがいいでしょう</entry>
+  <entry id="dialogue-013" kind="dialogue">まさか本気ではありませんよね</entry>
+  <entry id="dialogue-014" kind="dialogue">明日の朝に確かめましょう</entry>
+  <entry id="dialogue-015" kind="dialogue">猫ならさっき廊下にいました</entry>
+  <entry id="dialogue-016" kind="dialogue">その手紙を読んだのですか</entry>
+  <entry id="dialogue-017" kind="dialogue">約束したことを忘れましたか</entry>
+  <entry id="dialogue-018" kind="dialogue">私は図書室へ行くだけです</entry>
+  <entry id="dialogue-019" kind="dialogue">そんな顔をしないでください</entry>
+  <entry id="dialogue-020" kind="dialogue">毒ではないと思います</entry>
+  <entry id="dialogue-021" kind="dialogue">どうして月を数えているのですか</entry>
+  <entry id="dialogue-022" kind="dialogue">その鍵は開けないほうがいいです</entry>
+  <entry id="dialogue-023" kind="dialogue">お茶が冷めてしまいます</entry>
+  <entry id="dialogue-024" kind="dialogue">秘密にしておいてください</entry>
+  <entry id="dialogue-025" kind="dialogue">それなら話は別です</entry>
+</corpus>
