@@ -12,7 +12,7 @@ import { packEmbedSmall } from "./embed/small-bun.ts";
 import { denseHtml } from "./html/dense.ts";
 import { vectorStage } from "./vector/stage.ts";
 
-const cdn = "https://kitty-crow.github.io/braille-art-maker/v1/embed.js";
+const cdn = "https://kitty-crow.github.io/unicode-art-studio/v1/embed.js";
 const args = parseArgs(process.argv.slice(2));
 const png = PNG.sync.read(await readFile(args.input));
 const vector = vectorStage({ width: png.width, height: png.height, data: png.data }, { colours: 64, alphaLevels: 16 });
