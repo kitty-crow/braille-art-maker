@@ -1,4 +1,4 @@
-import { j8192Decode } from "../embed/j8192.ts";
+import { decodeU4 } from "../embed/codec.ts";
 
 const to13 = (bytes: Uint8Array): number[] => {
   const out: number[] = [];
@@ -17,15 +17,11 @@ const to13 = (bytes: Uint8Array): number[] => {
   return out;
 };
 
-const remainders = "0123456789ABC";
-
+// Interpret the exact u4 transport bytes as the same 13-bit symbols J8192 would carry.
+// Tiny payloads left in legacy basE91 therefore get the same local presentation too.
 export const j8192EntropyValues = (payload: string): number[] => {
-  const text = payload.trim();
-  if (text[0] !== "&" || !["J", "K", "L"].includes(text[1] ?? "")) {
-    throw new Error("Japanese ramble requires a J8192 u4 payload.");
-  }
-  const remainder = remainders.indexOf(text[2] ?? "");
-  if (remainder < 0) throw new Error("J8192 payload has invalid remainder metadata.");
-  const bytes = j8192Decode(text.slice(3), remainder as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12);
-  return to13(bytes);
+  const { bytes } = decodeU4(payload);
+  const values = to13(bytes);
+  if (values.length === 0) throw new Error("Japanese ramble requires a non-empty u4 payload.");
+  return values;
 };
