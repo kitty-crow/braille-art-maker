@@ -19,6 +19,7 @@ const loads = new Map<string, Promise<void>>();
 const richHighlightLimit = 96_000;
 const payloadToken = "__UNICODE_ART_PACKED_PAYLOAD__";
 const safeTextFallbackBytes = 4 * 1024 * 1024;
+const safeCompactTextChars = 256 * 1024;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -226,6 +227,7 @@ export class EmbedView {
     const label = button.querySelector<HTMLElement>(".copy-button__label");
     if (label) label.textContent = this.copyIdleLabel();
     button.setAttribute("aria-label", this.copyIdleLabel());
+    button.title = this.copyIdleLabel();
   }
 
   private showCopySuccess(button: HTMLButtonElement): void {
@@ -234,6 +236,7 @@ export class EmbedView {
     const label = button.querySelector<HTMLElement>(".copy-button__label");
     if (label) label.textContent = "Copied";
     button.setAttribute("aria-label", "Copied to clipboard");
+    button.title = "Copied";
     this.copyFeedbackTimer = window.setTimeout(() => this.syncCopyButton(), 1200);
   }
 
@@ -244,10 +247,21 @@ export class EmbedView {
     }
     if (!this.compact) return;
     try {
-      await navigator.clipboard.writeText(this.compact);
+      if (this.compact.length <= safeCompactTextChars) {
+        await navigator.clipboard.writeText(this.compact);
+      } else if (navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+        const blob = new Blob([this.compact], { type: "text/plain" });
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+      } else {
+        throw new Error("This browser cannot safely copy an embed this large. Use Download HTML instead.");
+      }
       this.showCopySuccess(button);
     } catch (error) {
-      console.warn(error instanceof Error ? error.message : "Clipboard access was blocked.");
+      const message = error instanceof Error ? error.message : "Clipboard access was blocked.";
+      console.warn(message);
+      button.setAttribute("aria-label", message);
+      button.title = message;
+      this.copyFeedbackTimer = window.setTimeout(() => this.syncCopyButton(), 2200);
     }
   }
 
