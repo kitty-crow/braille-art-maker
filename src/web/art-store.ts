@@ -1,6 +1,6 @@
 import { unpackBoundedRaw } from "../embed/bounded-raw.ts";
 import type { Art, ArtCfg } from "../types.ts";
-import { beginCacheRestore, clearCacheRestoreOnCleanExit, finishCacheRestore } from "./cache-guard.ts";
+import { beginCacheRestore, finishCacheRestore } from "./cache-guard.ts";
 
 const dbName = "unicode-art-maker-cache";
 const dbVersion = 2;
@@ -59,9 +59,6 @@ const db = (): Promise<IDBDatabase> => {
     const request = indexedDB.open(dbName, dbVersion);
     request.addEventListener("upgradeneeded", () => {
       const value = request.result;
-      // v0.4.18 used the legacy `art` store for structured-cloned Art objects. Keep it
-      // untouched so upgrading an existing browser database is non-destructive; v2 uses
-      // compact Blob-backed stores instead.
       if (!value.objectStoreNames.contains(legacyStore)) value.createObjectStore(legacyStore);
       if (!value.objectStoreNames.contains(sessionStore)) value.createObjectStore(sessionStore);
       if (!value.objectStoreNames.contains(artStore)) value.createObjectStore(artStore);
@@ -164,14 +161,13 @@ export const clearCachedArt = async (): Promise<void> => {
 };
 
 export const loadCachedArt = async (version: string): Promise<RestoredArt | null> => {
-  // If a previous page process died while restoring this exact version, the marker survives
-  // in localStorage. Discard that latest snapshot once so a bad/high-pressure cache cannot
-  // trap the tab in a reload -> restore -> crash loop.
+  // The marker is intentionally left pending until the maker explicitly finishes the whole
+  // restore transaction. If the page process dies anywhere during render/source rebuild, the
+  // next load drops this snapshot instead of entering a restore crash loop.
   if (!beginCacheRestore(version)) {
     await clearCachedArt().catch(() => {});
     return null;
   }
-  clearCacheRestoreOnCleanExit(version);
 
   try {
     const value = await db();
