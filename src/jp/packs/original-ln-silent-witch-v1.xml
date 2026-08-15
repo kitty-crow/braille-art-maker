@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<corpus id="original-ln-silent-witch-v1" version="1">
+  <entry id="sw-person-001" kind="person">人前が苦手な魔術師</entry>
+  <entry id="sw-person-002" kind="person">無詠唱を研究する学生</entry>
+  <entry id="sw-person-003" kind="person">生徒会の書記</entry>
+  <entry id="sw-person-004" kind="person">学院の優等生</entry>
+  <entry id="sw-person-005" kind="person">王子付きの護衛</entry>
+  <entry id="sw-person-006" kind="person">数字に強い少女</entry>
+  <entry id="sw-person-007" kind="person">魔術理論の教師</entry>
+  <entry id="sw-person-008" kind="person">寮を預かる先輩</entry>
+  <entry id="sw-person-009" kind="person">秘密を抱えた転入生</entry>
+  <entry id="sw-person-010" kind="person">生徒会長</entry>
+  <entry id="sw-person-011" kind="person">王都から来た監査役</entry>
+  <entry id="sw-person-012" kind="person">黒猫を連れた少女</entry>
+  <entry id="sw-person-013" kind="person">魔力測定を担当する教師</entry>
+  <entry id="sw-person-014" kind="person">貴族寮の学生</entry>
+  <entry id="sw-person-015" kind="person">口数の少ない研究員</entry>
+
+  <entry id="sw-place-001" kind="place">王立魔術学院</entry>
+  <entry id="sw-place-002" kind="place">生徒会室</entry>
+  <entry id="sw-place-003" kind="place">魔術訓練場</entry>
+  <entry id="sw-place-004" kind="place">学院の講堂</entry>
+  <entry id="sw-place-005" kind="place">女子寮の談話室</entry>
+  <entry id="sw-place-006" kind="place">旧校舎の階段</entry>
+  <entry id="sw-place-007" kind="place">魔術理論の教室</entry>
+  <entry id="sw-place-008" kind="place">学院の資料室</entry>
+  <entry id="sw-place-009" kind="place">時計塔の踊り場</entry>
+  <entry id="sw-place-010" kind="place">試験会場</entry>
+  <entry id="sw-place-011" kind="place">寮の自習室</entry>
+  <entry id="sw-place-012" kind="place">王族用の控え室</entry>
+
+  <entry id="sw-object-001" kind="object">術式を書いたノート</entry>
+  <entry id="sw-object-002" kind="object">魔力測定器</entry>
+  <entry id="sw-object-003" kind="object">数式の走り書き</entry>
+  <entry id="sw-object-004" kind="object">学生証</entry>
+  <entry id="sw-object-005" kind="object">封印の札</entry>
+  <entry id="sw-object-006" kind="object">魔術杖</entry>
+  <entry id="sw-object-007" kind="object">王家の紋章</entry>
+  <entry id="sw-object-008" kind="object">生徒会の議事録</entry>
+  <entry id="sw-object-009" kind="object">試験問題の束</entry>
+  <entry id="sw-object-010" kind="object">魔法陣を描いた紙</entry>
+  <entry id="sw-object-011" kind="object">黒猫の首輪</entry>
+  <entry id="sw-object-012" kind="object">銀縁の眼鏡</entry>
+  <entry id="sw-object-013" kind="object">学院祭の招待状</entry>
+  <entry id="sw-object-014" kind="object">暗号めいた計算式</entry>
+  <entry id="sw-object-015" kind="object">欠けた魔力石</entry>
+  <entry id="sw-object-016" kind="object">封筒に入った報告書</entry>
+  <entry id="sw-object-017" kind="object">小さな通信魔道具</entry>
+  <entry id="sw-object-018" kind="object">寮の予備鍵</entry>
+
+  <entry id="sw-noun-001" kind="noun">詠唱</entry>
+  <entry id="sw-noun-002" kind="noun">任務</entry>
+  <entry id="sw-noun-003" kind="noun">護衛</entry>
+  <entry id="sw-noun-004" kind="noun">計算</entry>
+  <entry id="sw-noun-005" kind="noun">魔力</entry>
+  <entry id="sw-noun-006" kind="noun">試験</entry>
+  <entry id="sw-noun-007" kind="noun">正体</entry>
+  <entry id="sw-noun-008" kind="noun">学園生活</entry>
+  <entry id="sw-noun-009" kind="noun">沈黙の術式</entry>
+  <entry id="sw-noun-010" kind="noun">秘密の護衛任務</entry>
+
+  <entry id="sw-dialogue-001" kind="dialogue">声に出さなくても術式は成立します</entry>
+  <entry id="sw-dialogue-002" kind="dialogue">その計算はどこで覚えたのですか</entry>
+  <entry id="sw-dialogue-003" kind="dialogue">私は目立ちたくないだけです</entry>
+  <entry id="sw-dialogue-004" kind="dialogue">このことは誰にも言わないでください</entry>
+  <entry id="sw-dialogue-005" kind="dialogue">今の魔術には詠唱がありませんでした</entry>
+  <entry id="sw-dialogue-006" kind="dialogue">生徒会には報告しておきます</entry>
+  <entry id="sw-dialogue-007" kind="dialogue">ここでは普通の学生として扱ってください</entry>
+  <entry id="sw-dialogue-008" kind="dialogue">護衛対象から目を離さないでください</entry>
+
+  <entry id="sw-adjective-001" kind="adjective">無口|na</entry>
+  <entry id="sw-adjective-002" kind="adjective">緻密|na</entry>
+  <entry id="sw-adjective-003" kind="adjective">秘密|na</entry>
+  <entry id="sw-adjective-004" kind="adjective">複雑|na</entry>
+  <entry id="sw-adjective-005" kind="adjective">目立たない|i</entry>
+
+  <entry id="sw-connector-001" kind="connector">授業が終わるころ</entry>
+  <entry id="sw-connector-002" kind="connector">誰にも気づかれないまま</entry>
+</corpus>

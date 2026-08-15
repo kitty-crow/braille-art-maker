@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { decodeU4, encodeU4Japanese, type U4Mode } from "../src/embed/codec.ts";
 import { decodeJapaneseCompact, encodeJapaneseCompact, japaneseCompactPrefix } from "../src/embed/japanese.ts";
+import { originalLnCorpus, originalLnCorpusV1 } from "../src/jp/default.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 
 const modes: readonly U4Mode[] = ["r", "d", "b"];
@@ -27,6 +28,26 @@ test("story payload is single-line and reversible", () => {
       expect(decoded.mode).toBe(mode);
       expect([...decoded.bytes]).toEqual([...bytes]);
     }
+  }
+});
+
+test("current story transport carries the v2 prose marker", () => {
+  const encoded = encodeJapaneseCompact("r", Uint8Array.of(1, 2, 3));
+  expect(encoded).toContain("静かな魔法の気配が、物語の奥で揺れている。");
+  expect(decodeJapaneseCompact(encoded).bytes).toEqual(Uint8Array.of(1, 2, 3));
+});
+
+test("silent-witch vocabulary is added without mutating the legacy corpus", () => {
+  const current = new Set(originalLnCorpus.entries.map(entry => entry.text));
+  const legacy = new Set(originalLnCorpusV1.entries.map(entry => entry.text));
+  for (const text of [
+    "人前が苦手な魔術師",
+    "王立魔術学院",
+    "術式を書いたノート",
+    "声に出さなくても術式は成立します",
+  ]) {
+    expect(current.has(text)).toBe(true);
+    expect(legacy.has(text)).toBe(false);
   }
 });
 
