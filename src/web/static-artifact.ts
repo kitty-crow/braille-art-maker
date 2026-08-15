@@ -30,7 +30,7 @@ export const makeStaticArtifact = async (packed: PackedEmbed): Promise<StaticArt
   });
 
   const blob = await new Response(stream, {
-    headers: { "content-type": "text/html;charset=utf-8" },
+    headers: { "content-type": "text/plain;charset=utf-8" },
   }).blob();
 
   return { blob, preview, truncated: chars > preview.length };
