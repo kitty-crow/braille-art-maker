@@ -23,10 +23,12 @@ const byKind = (pack: CorpusPack, kind: CorpusEntry["kind"]): readonly CorpusEnt
 };
 const pick = (e: Entropy, values: readonly CorpusEntry[]): CorpusEntry => values[e.take(values.length)]!;
 const text = (e: Entropy, values: readonly CorpusEntry[]): string => pick(e, values).text;
-interface Lexicon { readonly nouns: readonly CorpusEntry[]; readonly people: readonly CorpusEntry[]; readonly places: readonly CorpusEntry[]; readonly objects: readonly CorpusEntry[]; readonly verbs: readonly CorpusEntry[]; readonly adjectives: readonly CorpusEntry[]; readonly connectors: readonly CorpusEntry[]; readonly dialogue: readonly CorpusEntry[]; }
-const lexicon = (pack: CorpusPack): Lexicon => ({ nouns: byKind(pack, "noun"), people: byKind(pack, "person"), places: byKind(pack, "place"), objects: byKind(pack, "object"), verbs: byKind(pack, "verb"), adjectives: byKind(pack, "adjective"), connectors: byKind(pack, "connector"), dialogue: byKind(pack, "dialogue") });
+interface Lexicon { readonly nouns: readonly CorpusEntry[]; readonly people: readonly CorpusEntry[]; readonly places: readonly CorpusEntry[]; readonly objects: readonly CorpusEntry[]; readonly verbs: readonly CorpusEntry[]; readonly adjectives: readonly CorpusEntry[]; readonly connectors: readonly CorpusEntry[]; readonly dialogue: readonly CorpusEntry[]; readonly templates: readonly CorpusEntry[]; }
+const lexicon = (pack: CorpusPack): Lexicon => ({ nouns: byKind(pack, "noun"), people: byKind(pack, "person"), places: byKind(pack, "place"), objects: byKind(pack, "object"), verbs: byKind(pack, "verb"), adjectives: byKind(pack, "adjective"), connectors: byKind(pack, "connector"), dialogue: byKind(pack, "dialogue"), templates: byKind(pack, "template") });
 const tagged = (values: readonly CorpusEntry[], tag: string): readonly CorpusEntry[] => { const found = values.filter(value => value.tags.includes(tag)); return found.length > 0 ? found : values; };
-const verbForm = (entry: CorpusEntry, e: Entropy): string => { const forms = entry.text.split("|"); return forms[e.take(forms.length)]!; };
+const verbForms = (entry: CorpusEntry): readonly string[] => entry.text.split("|");
+const verbForm = (entry: CorpusEntry, e: Entropy): string => { const forms = verbForms(entry); return forms[e.take(forms.length)]!; };
+const verbDict = (entry: CorpusEntry): string => verbForms(entry)[0]!;
 const adjective = (entry: CorpusEntry, noun: string): string => { const [plain, cls] = entry.text.split("|"); return cls === "na" ? `${plain}な${noun}` : `${plain}${noun}`; };
 const person = (e: Entropy, l: Lexicon): string => text(e, l.people);
 const subject = (e: Entropy, l: Lexicon): string => text(e, e.take(4) === 0 ? l.nouns : l.people);
@@ -35,9 +37,14 @@ const place = (e: Entropy, l: Lexicon): string => text(e, l.places);
 const line = (e: Entropy, l: Lexicon): string => text(e, l.dialogue);
 const connector = (e: Entropy, l: Lexicon): string => text(e, l.connectors);
 const decoratedObject = (e: Entropy, l: Lexicon): string => adjective(pick(e, l.adjectives), object(e, l));
-const transitive = (e: Entropy, l: Lexicon): string => verbForm(pick(e, tagged(l.verbs, "transitive")), e);
-const motionVerb = (e: Entropy, l: Lexicon): string => verbForm(pick(e, tagged(l.verbs, "motion")), e);
-const intransitive = (e: Entropy, l: Lexicon): string => verbForm(pick(e, tagged(l.verbs, "intransitive")), e);
+const transitiveEntry = (e: Entropy, l: Lexicon): CorpusEntry => pick(e, tagged(l.verbs, "transitive"));
+const motionEntry = (e: Entropy, l: Lexicon): CorpusEntry => pick(e, tagged(l.verbs, "motion"));
+const intransitiveEntry = (e: Entropy, l: Lexicon): CorpusEntry => pick(e, tagged(l.verbs, "intransitive"));
+const transitive = (e: Entropy, l: Lexicon): string => verbForm(transitiveEntry(e, l), e);
+const motionVerb = (e: Entropy, l: Lexicon): string => verbForm(motionEntry(e, l), e);
+const intransitive = (e: Entropy, l: Lexicon): string => verbForm(intransitiveEntry(e, l), e);
+const transitiveDict = (e: Entropy, l: Lexicon): string => verbDict(transitiveEntry(e, l));
+const motionDict = (e: Entropy, l: Lexicon): string => verbDict(motionEntry(e, l));
 
 type Frame = (e: Entropy, l: Lexicon) => string;
 
@@ -68,11 +75,33 @@ const frames: readonly Frame[] = [
   comparison, purpose, before, evenIf,
 ];
 
+const templateValue = (token: string, e: Entropy, l: Lexicon): string => {
+  switch (token) {
+    case "person": return person(e, l);
+    case "subject": return subject(e, l);
+    case "place": case "place2": return place(e, l);
+    case "object": case "object2": return object(e, l);
+    case "decoratedObject": return decoratedObject(e, l);
+    case "dialogue": return line(e, l);
+    case "connector": return connector(e, l);
+    case "transitive": return transitive(e, l);
+    case "transitiveDict": return transitiveDict(e, l);
+    case "motion": return motionVerb(e, l);
+    case "motionDict": return motionDict(e, l);
+    case "intransitive": return intransitive(e, l);
+    default: throw new Error(`Unsupported Japanese corpus template token: ${token}`);
+  }
+};
+
+const corpusTemplate: Frame = (e, l) => text(e, l.templates).replace(/\{([A-Za-z][A-Za-z0-9]*)\}/gu, (_match, token: string) => templateValue(token, e, l));
+
 export interface RambleOptions { readonly sentences?: number; }
 export const japaneseRamble = (pack: CorpusPack, entropy: Entropy, options: RambleOptions = {}): string => {
   const l = lexicon(pack);
   const count = Math.max(1, Math.min(64, Math.round(options.sentences ?? 12)));
   const out: string[] = [];
-  for (let i = 0; i < count; i += 1) out.push(frames[entropy.take(frames.length)]!(entropy, l));
+  for (let i = 0; i < count; i += 1) {
+    out.push(entropy.take(4) === 0 ? frames[entropy.take(frames.length)]!(entropy, l) : corpusTemplate(entropy, l));
+  }
   return out.join("\n");
 };
