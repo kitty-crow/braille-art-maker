@@ -80,9 +80,9 @@ The CLI does not impose the browser slider's 2048-cell ceiling. Very large resol
 
 ## Embedding
 
-The studio's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
+The Studio embed output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the existing copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch. The copy icon in the top-right of the code box copies whichever tab is selected and changes to a checkmark when the clipboard write succeeds, then returns to the copy icon. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
 
 ### Compact payload modes
 
@@ -111,9 +111,9 @@ The CDN runtime remains backwards-compatible with the previous explicit template
 Published assets:
 
 ```text
-https://kitty-crow.github.io/braille-art-maker/v1/embed.js
-https://kitty-crow.github.io/braille-art-maker/v1/embed.css
-https://kitty-crow.github.io/braille-art-maker/v1/load.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.css
+https://kitty-crow.github.io/unicode-art-studio/v1/load.js
 ```
 
 With the default `data-surface="auto"`, a light-themed foreground-only Colour embed deliberately uses the dark surface for readability. Full Colour embeds follow the light surface normally. A site author can force `data-surface="light"`, but should be aware that some foreground colours may then become difficult to see.
