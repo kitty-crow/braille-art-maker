@@ -1,9 +1,14 @@
+import type { EmbedCodec, PackedEmbed } from "../embed/codec.ts";
+import { staticArtHtml } from "../embed/static-html.ts";
+import { unpackEmbedSmall } from "../embed/small-browser.ts";
+import type { Art, ArtCfg } from "../types.ts";
 import { finishCacheRestore } from "./cache-guard.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
+type Mode = "compact" | "static";
 
 declare const __WEB_VERSION__: string;
 
@@ -61,20 +66,155 @@ const fence = (value: string): string => {
   return "`".repeat(Math.max(3, longest + 1));
 };
 
+const textFromMasks = (packed: PackedEmbed): string => {
+  const lines = new Array<string>(packed.rows);
+  for (let y = 0; y < packed.rows; y += 1) {
+    let line = "";
+    const offset = y * packed.columns;
+    for (let x = 0; x < packed.columns; x += 1) line += String.fromCodePoint(0x2800 + (packed.masks[offset + x] ?? 0));
+    lines[y] = line;
+  }
+  return lines.join("\n");
+};
+
+const artFromPacked = (packed: PackedEmbed): { art: Art; cfg: ArtCfg } => ({
+  art: {
+    text: textFromMasks(packed),
+    columns: packed.columns,
+    rows: packed.rows,
+    dotsWidth: packed.columns * 2,
+    dotsHeight: packed.rows * 4,
+    threshold: 0,
+    density: 0,
+    ...(packed.cellColours ? { cellColours: packed.cellColours } : {}),
+  },
+  cfg: {
+    colour: packed.colour,
+    colourBackground: packed.colourBackground,
+    fullColour: packed.fullColour,
+  },
+});
+
+const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const envelope = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]')?.textContent?.trim() ?? "";
+  const digit = envelope[0];
+  if (digit !== "1" && digit !== "2" && digit !== "3" && digit !== "4") throw new Error("Compact embed payload is missing its codec marker.");
+  if (envelope.length < 2) throw new Error("Compact embed payload is empty.");
+  return { codec: `u${digit}` as EmbedCodec, data: envelope.slice(1) };
+};
+
 export class EmbedView {
-  private generation = 0;
-  constructor(private readonly host: HTMLElement) {}
+  private renderGeneration = 0;
+  private staticGeneration = 0;
+  private mode: Mode = "compact";
+  private compact = "";
+  private staticHtml = "";
+  private readonly compactTab: HTMLButtonElement;
+  private readonly staticTab: HTMLButtonElement;
+
+  constructor(private readonly host: HTMLElement) {
+    const tabs = document.createElement("div");
+    tabs.className = "embed-code-tabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", "Embed format");
+    this.compactTab = this.tab("Compact", "compact", true);
+    this.staticTab = this.tab("No JavaScript", "static", false);
+    tabs.append(this.compactTab, this.staticTab);
+    host.before(tabs);
+
+    const copy = document.querySelector<HTMLButtonElement>("#copy-embed");
+    copy?.addEventListener("click", event => {
+      if (this.mode !== "static") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void this.copyStatic(copy);
+    }, { capture: true });
+  }
 
   render(source: string): void {
-    const generation = ++this.generation;
+    this.compact = source;
+    this.staticHtml = "";
+    ++this.staticGeneration;
     if (!source) {
       this.host.replaceChildren();
       finishCacheRestore(__WEB_VERSION__);
       return;
     }
-    // Syntax-highlighting a multi-megabyte packed embed duplicates the source several times
-    // through Markdown parsing, sanitising and token spans. Keep huge payloads as one plain
-    // text node instead; the copied embed remains byte-for-byte identical.
+    if (this.mode === "static") void this.showStatic();
+    else this.renderCode(source);
+  }
+
+  private tab(label: string, mode: Mode, selected: boolean): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "embed-code-tab";
+    button.textContent = label;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(selected));
+    button.dataset.mode = mode;
+    if (mode === "static") button.title = "Self-contained HTML with inline CSS only: no JavaScript, external scripts, stylesheets or fetching.";
+    button.addEventListener("click", () => this.select(mode));
+    return button;
+  }
+
+  private select(mode: Mode): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.compactTab.setAttribute("aria-selected", String(mode === "compact"));
+    this.staticTab.setAttribute("aria-selected", String(mode === "static"));
+    if (!this.compact) {
+      this.host.replaceChildren();
+      return;
+    }
+    if (mode === "compact") this.renderCode(this.compact);
+    else void this.showStatic();
+  }
+
+  private async showStatic(): Promise<string> {
+    if (this.staticHtml) {
+      this.renderCode(this.staticHtml);
+      return this.staticHtml;
+    }
+    const compact = this.compact;
+    const generation = ++this.staticGeneration;
+    this.message("Building self-contained HTML…");
+    try {
+      const packed = packedSource(compact);
+      const decoded = await unpackEmbedSmall(packed.data, packed.codec);
+      if (generation !== this.staticGeneration || compact !== this.compact) return "";
+      const value = artFromPacked(decoded);
+      const html = staticArtHtml(value.art, value.cfg);
+      if (generation !== this.staticGeneration || compact !== this.compact) return "";
+      this.staticHtml = html;
+      if (this.mode === "static") this.renderCode(html);
+      return html;
+    } catch (error) {
+      if (generation !== this.staticGeneration || compact !== this.compact) return "";
+      const message = error instanceof Error ? error.message : "Static HTML generation failed.";
+      this.message(`No-JavaScript HTML unavailable: ${message}`);
+      return "";
+    }
+  }
+
+  private async copyStatic(button: HTMLButtonElement): Promise<void> {
+    const html = this.staticHtml || await this.showStatic();
+    if (!html) return;
+    try {
+      await navigator.clipboard.writeText(html);
+      const old = button.textContent;
+      button.textContent = "Copied static HTML";
+      setTimeout(() => { button.textContent = old; }, 1100);
+    } catch {
+      this.message("Clipboard access was blocked. Select the displayed static HTML and copy it manually.");
+    }
+  }
+
+  private renderCode(source: string): void {
+    const generation = ++this.renderGeneration;
+    // Syntax-highlighting a multi-megabyte packed/static embed duplicates the source several
+    // times through Markdown parsing, sanitising and token spans. Keep huge payloads as one
+    // plain text node; the copied source remains byte-for-byte identical.
     if (source.length > richHighlightLimit) {
       this.plain(source);
       return;
@@ -85,17 +225,17 @@ export class EmbedView {
   private async marked(source: string, generation: number): Promise<void> {
     try {
       const api = await libs();
-      if (generation !== this.generation) return;
+      if (generation !== this.renderGeneration) return;
       const ticks = fence(source);
       const rendered = await api.marked.parse(`${ticks}html\n${source}\n${ticks}`);
-      if (generation !== this.generation) return;
+      if (generation !== this.renderGeneration) return;
       this.host.innerHTML = api.purify.sanitize(String(rendered));
       const blocks = this.host.querySelectorAll<HTMLElement>("pre code");
       if (blocks.length === 0) { this.plain(source); return; }
       blocks.forEach(block => api.highlight.highlightElement(block));
       finishCacheRestore(__WEB_VERSION__);
     } catch {
-      if (generation === this.generation) this.plain(source);
+      if (generation === this.renderGeneration) this.plain(source);
     }
   }
 
@@ -107,5 +247,13 @@ export class EmbedView {
     pre.append(code);
     this.host.replaceChildren(pre);
     finishCacheRestore(__WEB_VERSION__);
+  }
+
+  private message(text: string): void {
+    const pre = document.createElement("pre");
+    const code = document.createElement("code");
+    code.textContent = text;
+    pre.append(code);
+    this.host.replaceChildren(pre);
   }
 }
