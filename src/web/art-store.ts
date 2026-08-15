@@ -1,5 +1,6 @@
 import { unpackBoundedRaw } from "../embed/bounded-raw.ts";
 import type { Art, ArtCfg } from "../types.ts";
+import { beginCacheRestore, clearCacheRestoreOnCleanExit, finishCacheRestore } from "./cache-guard.ts";
 
 const dbName = "unicode-art-maker-cache";
 const dbVersion = 2;
@@ -153,33 +154,6 @@ export const storeCachedEmbed = async (version: string, id: string, html: string
   await done(transaction);
 };
 
-export const loadCachedArt = async (version: string): Promise<RestoredArt | null> => {
-  const value = await db();
-  const transaction = value.transaction([sessionStore, artStore, embedStore], "readonly");
-  const sessionRequest = transaction.objectStore(sessionStore).get(latestKey);
-  const artRequest = transaction.objectStore(artStore).get(latestKey);
-  const embedRequest = transaction.objectStore(embedStore).get(latestKey);
-  const [session, rawBlob, cachedEmbed] = await Promise.all([
-    result<SessionRecord>(sessionRequest),
-    result<Blob>(artRequest),
-    result<EmbedRecord>(embedRequest),
-  ]);
-  await done(transaction);
-  if (!session || session.version !== version || !rawBlob) return null;
-  const art = restoreArt(new Uint8Array(await rawBlob.arrayBuffer()), session.art);
-  const embed = cachedEmbed?.version === version && cachedEmbed.id === session.id ? await cachedEmbed.html.text() : undefined;
-  return {
-    id: session.id,
-    name: session.name,
-    source: session.source,
-    cfg: session.cfg,
-    paths: session.paths,
-    rectangles: session.rectangles,
-    art,
-    ...(embed !== undefined ? { embed } : {}),
-  };
-};
-
 export const clearCachedArt = async (): Promise<void> => {
   const value = await db();
   const transaction = value.transaction([sessionStore, artStore, embedStore], "readwrite");
@@ -187,4 +161,48 @@ export const clearCachedArt = async (): Promise<void> => {
   transaction.objectStore(artStore).delete(latestKey);
   transaction.objectStore(embedStore).delete(latestKey);
   await done(transaction);
+};
+
+export const loadCachedArt = async (version: string): Promise<RestoredArt | null> => {
+  // If a previous page process died while restoring this exact version, the marker survives
+  // in localStorage. Discard that latest snapshot once so a bad/high-pressure cache cannot
+  // trap the tab in a reload -> restore -> crash loop.
+  if (!beginCacheRestore(version)) {
+    await clearCachedArt().catch(() => {});
+    return null;
+  }
+  clearCacheRestoreOnCleanExit(version);
+
+  try {
+    const value = await db();
+    const transaction = value.transaction([sessionStore, artStore, embedStore], "readonly");
+    const sessionRequest = transaction.objectStore(sessionStore).get(latestKey);
+    const artRequest = transaction.objectStore(artStore).get(latestKey);
+    const embedRequest = transaction.objectStore(embedStore).get(latestKey);
+    const [session, rawBlob, cachedEmbed] = await Promise.all([
+      result<SessionRecord>(sessionRequest),
+      result<Blob>(artRequest),
+      result<EmbedRecord>(embedRequest),
+    ]);
+    await done(transaction);
+    if (!session || session.version !== version || !rawBlob) {
+      finishCacheRestore(version);
+      return null;
+    }
+    const art = restoreArt(new Uint8Array(await rawBlob.arrayBuffer()), session.art);
+    const embed = cachedEmbed?.version === version && cachedEmbed.id === session.id ? await cachedEmbed.html.text() : undefined;
+    return {
+      id: session.id,
+      name: session.name,
+      source: session.source,
+      cfg: session.cfg,
+      paths: session.paths,
+      rectangles: session.rectangles,
+      art,
+      ...(embed !== undefined ? { embed } : {}),
+    };
+  } catch (error) {
+    finishCacheRestore(version);
+    throw error;
+  }
 };
