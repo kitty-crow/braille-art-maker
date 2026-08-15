@@ -80,17 +80,32 @@ The CLI does not impose the browser slider's 2048-cell ceiling. Very large resol
 
 ## Embedding
 
-The studio's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
+The studio's **Copy embed** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the existing copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal small runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
 
 ### Compact payload modes
 
 Compact has one optional checkbox: **Payload as a story**.
 
-With the checkbox **off**, Compact uses the super-compact `u4` transport. The optimiser compares safe basE91 with **J8192**, a 13-bit Japanese-oriented alphabet of exactly 8,192 normalisation-stable BMP characters built from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. It chooses the shortest character count. For substantial payloads J8192 is roughly half the basE91 character count.
+There are two lossless ways to represent the selected compressed bytes:
+
+- **Super compact** is the default. It is designed to minimise visible source/clipboard character count.
+- **Payload as a story**, also described as the **light-novel encoding**, stores those same bytes as deterministic reversible Japanese prose.
+
+The two modes do not change the artwork and do not choose different image content. They are text transports for the same packed image data, selected after the normal lossless `u4` optimisation.
+
+#### Super compact encoding
+
+With **Payload as a story** off, Compact uses the super-compact `u4` transport. The optimiser compares safe basE91 with **J8192**, a 13-bit Japanese-oriented alphabet of exactly 8,192 normalisation-stable BMP characters built from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. It chooses the shortest character count. For substantial payloads J8192 is roughly half the basE91 character count.
+
+J8192 can look Japanese because its alphabet is made of Japanese-script and Japanese-mapped characters, but it is **not Japanese prose and it does not describe the image**. Each symbol is simply a dense reversible carrier for 13 payload bits, conceptually similar to a high-capacity base encoding.
+
+#### Payload as a story / light-novel encoding
 
 With **Payload as a story** checked, the same compressed image bytes are encoded as deterministic Japanese prose instead. The prose is not a preview or decoration: the sentence templates, people, places, objects, verbs and other lexical choices are mixed-radix digits carrying the payload itself. Decoding those choices reconstructs the exact compressed bytes and therefore the exact image. Editing the story changes or corrupts the encoded image.
+
+The phrase **light-novel encoding** describes the style of the resulting Japanese text. It does **not** mean an AI looks at the PNG and writes a story about it. The encoder deterministically selects grammatical templates and words because every choice represents part of the binary value. The surreal prose is therefore simultaneously readable-looking text and the actual reversible data representation.
 
 Story mode is intentionally larger than super-compact mode because natural Japanese needs grammatical material that carries less information per visible character. The payoff is that the payload reads like surreal light-novel prose instead of looking like an encoded blob. The complete story remains a **single physical line** inside `data-unicode-art-data`; normal browser wrapping does not add payload newlines.
 
@@ -111,9 +126,9 @@ The CDN runtime remains backwards-compatible with the previous explicit template
 Published assets:
 
 ```text
-https://kitty-crow.github.io/braille-art-maker/v1/embed.js
-https://kitty-crow.github.io/braille-art-maker/v1/embed.css
-https://kitty-crow.github.io/braille-art-maker/v1/load.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.css
+https://kitty-crow.github.io/unicode-art-studio/v1/load.js
 ```
 
 With the default `data-surface="auto"`, a light-themed foreground-only Colour embed deliberately uses the dark surface for readability. Full Colour embeds follow the light surface normally. A site author can force `data-surface="light"`, but should be aware that some foreground colours may then become difficult to see.
