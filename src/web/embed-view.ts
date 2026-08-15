@@ -1,14 +1,13 @@
 import type { EmbedCodec } from "../embed/codec.ts";
-import { staticPackedHtml } from "../embed/static-html.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
+import { makeStaticArtifact, type StaticArtifact } from "./static-artifact.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
 type Mode = "compact" | "static";
-interface MaskedPart { readonly payload: string; readonly className?: string; }
-interface MaskedSource { readonly source: string; readonly parts: readonly MaskedPart[]; }
+interface MaskedPayload { readonly source: string; readonly token: string; readonly payload: string; }
 
 const src = {
   marked: "https://cdn.jsdelivr.net/npm/marked@18.0.7/lib/marked.umd.js",
@@ -17,8 +16,8 @@ const src = {
 } as const;
 const loads = new Map<string, Promise<void>>();
 const richHighlightLimit = 96_000;
-const tokenPrefix = "__UNICODE_ART_MASK_";
-const token = (index: number): string => `${tokenPrefix}${index}__`;
+const payloadToken = "__UNICODE_ART_PACKED_PAYLOAD__";
+const safeTextFallbackBytes = 4 * 1024 * 1024;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -66,7 +65,7 @@ const fence = (value: string): string => {
   return "`".repeat(Math.max(3, longest + 1));
 };
 
-const maskCompactPayload = (source: string): MaskedSource | null => {
+const maskCompactPayload = (source: string): MaskedPayload | null => {
   const marker = source.indexOf("data-unicode-art-data");
   if (marker < 0) return null;
   const open = source.lastIndexOf("<script", marker);
@@ -76,63 +75,33 @@ const maskCompactPayload = (source: string): MaskedSource | null => {
   const payload = source.slice(start + 1, end);
   if (!payload) return null;
   return {
-    source: `${source.slice(0, start + 1)}${token(0)}${source.slice(end)}`,
-    parts: [{ payload, className: "hljs-string" }],
+    source: `${source.slice(0, start + 1)}${payloadToken}${source.slice(end)}`,
+    token: payloadToken,
+    payload,
   };
 };
 
-const maskStaticSource = (source: string): MaskedSource | null => {
-  if (!source.includes('aria-label="Generated Unicode art"')) return null;
-  const parts: MaskedPart[] = [];
-  const add = (payload: string): string => {
-    const index = parts.length;
-    parts.push({ payload });
-    return token(index);
-  };
-  let masked = source.replace(/style="([^"]*)"/gu, (_whole, value: string) => `style="${add(value)}"`);
-  masked = masked.replace(/[\u2800-\u28ff]{32,}/gu, value => add(value));
-  return parts.length > 0 ? { source: masked, parts } : null;
-};
-
-const restoreMaskedSource = (host: HTMLElement, masked: MaskedSource): boolean => {
-  const nodes: Text[] = [];
+const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean => {
   const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
-    if ((node as Text).data.includes(tokenPrefix)) nodes.push(node as Text);
+    const text = node as Text;
+    const at = text.data.indexOf(masked.token);
+    if (at >= 0) {
+      const fragment = document.createDocumentFragment();
+      if (at > 0) fragment.append(document.createTextNode(text.data.slice(0, at)));
+      const payload = document.createElement("span");
+      payload.className = "hljs-string";
+      payload.textContent = masked.payload;
+      fragment.append(payload);
+      const after = text.data.slice(at + masked.token.length);
+      if (after) fragment.append(document.createTextNode(after));
+      text.replaceWith(fragment);
+      return true;
+    }
     node = walker.nextNode();
   }
-
-  let restored = 0;
-  for (const text of nodes) {
-    const source = text.data;
-    const pattern = /__UNICODE_ART_MASK_(\d+)__/gu;
-    let match: RegExpExecArray | null;
-    let at = 0;
-    const fragment = document.createDocumentFragment();
-    let changed = false;
-    while ((match = pattern.exec(source)) !== null) {
-      const index = Number(match[1]);
-      const part = masked.parts[index];
-      if (!part) continue;
-      if (match.index > at) fragment.append(document.createTextNode(source.slice(at, match.index)));
-      if (part.className) {
-        const span = document.createElement("span");
-        span.className = part.className;
-        span.textContent = part.payload;
-        fragment.append(span);
-      } else {
-        fragment.append(document.createTextNode(part.payload));
-      }
-      at = match.index + match[0].length;
-      restored += 1;
-      changed = true;
-    }
-    if (!changed) continue;
-    if (at < source.length) fragment.append(document.createTextNode(source.slice(at)));
-    text.replaceWith(fragment);
-  }
-  return restored === masked.parts.length;
+  return false;
 };
 
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
@@ -149,7 +118,7 @@ export class EmbedView {
   private staticGeneration = 0;
   private mode: Mode = "compact";
   private compact = "";
-  private staticHtml = "";
+  private staticArtifact: StaticArtifact | null = null;
   private readonly compactTab: HTMLButtonElement;
   private readonly staticTab: HTMLButtonElement;
 
@@ -174,7 +143,7 @@ export class EmbedView {
 
   render(source: string): void {
     this.compact = source;
-    this.staticHtml = "";
+    this.staticArtifact = null;
     ++this.staticGeneration;
     if (!source) {
       this.host.replaceChildren();
@@ -210,10 +179,15 @@ export class EmbedView {
     else void this.showStatic();
   }
 
-  private async showStatic(): Promise<string> {
-    if (this.staticHtml) {
-      this.renderCode(this.staticHtml);
-      return this.staticHtml;
+  private staticPreview(artifact: StaticArtifact): string {
+    if (!artifact.truncated) return artifact.preview;
+    return `${artifact.preview}\n<!-- Preview truncated in the maker. Copy embed copies the complete self-contained HTML. -->`;
+  }
+
+  private async showStatic(): Promise<StaticArtifact | null> {
+    if (this.staticArtifact) {
+      this.renderCode(this.staticPreview(this.staticArtifact));
+      return this.staticArtifact;
     }
     const compact = this.compact;
     const generation = ++this.staticGeneration;
@@ -221,37 +195,43 @@ export class EmbedView {
     try {
       const packed = packedSource(compact);
       const decoded = await unpackEmbedSmall(packed.data, packed.codec);
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      const html = staticPackedHtml(decoded);
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      this.staticHtml = html;
-      if (this.mode === "static") this.renderCode(html);
-      return html;
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
+      const artifact = await makeStaticArtifact(decoded);
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
+      this.staticArtifact = artifact;
+      if (this.mode === "static") this.renderCode(this.staticPreview(artifact));
+      return artifact;
     } catch (error) {
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
       const message = error instanceof Error ? error.message : "Static HTML generation failed.";
       this.message(`No-JavaScript HTML unavailable: ${message}`);
-      return "";
+      return null;
     }
   }
 
   private async copyStatic(button: HTMLButtonElement): Promise<void> {
-    const html = this.staticHtml || await this.showStatic();
-    if (!html) return;
+    const artifact = this.staticArtifact ?? await this.showStatic();
+    if (!artifact) return;
     try {
-      await navigator.clipboard.writeText(html);
+      if (navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": artifact.blob })]);
+      } else {
+        if (artifact.blob.size > safeTextFallbackBytes) throw new Error("This browser cannot copy such a large static embed without materialising it in memory. Use a browser with ClipboardItem support.");
+        await navigator.clipboard.writeText(await artifact.blob.text());
+      }
       const old = button.textContent;
       button.textContent = "Copied static HTML";
       setTimeout(() => { button.textContent = old; }, 1100);
-    } catch {
-      this.message("Clipboard access was blocked. Select the displayed static HTML and copy it manually.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Clipboard access was blocked.";
+      this.message(message);
     }
   }
 
   private renderCode(source: string): void {
     const generation = ++this.renderGeneration;
     if (source.length > richHighlightLimit) {
-      const masked = maskCompactPayload(source) ?? maskStaticSource(source);
+      const masked = maskCompactPayload(source);
       if (masked) {
         void this.marked(source, generation, masked);
         return;
@@ -262,7 +242,7 @@ export class EmbedView {
     void this.marked(source, generation);
   }
 
-  private async marked(source: string, generation: number, masked?: MaskedSource): Promise<void> {
+  private async marked(source: string, generation: number, masked?: MaskedPayload): Promise<void> {
     try {
       const api = await libs();
       if (generation !== this.renderGeneration) return;
@@ -274,7 +254,7 @@ export class EmbedView {
       const blocks = this.host.querySelectorAll<HTMLElement>("pre code");
       if (blocks.length === 0) { this.plain(source); return; }
       blocks.forEach(block => api.highlight.highlightElement(block));
-      if (masked && !restoreMaskedSource(this.host, masked)) this.plain(source);
+      if (masked && !restoreMaskedPayload(this.host, masked)) this.plain(source);
     } catch {
       if (generation === this.renderGeneration) this.plain(source);
     }
