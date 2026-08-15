@@ -9,7 +9,7 @@ const assets = join(site, "assets");
 const api = join(site, "v1");
 const tplDir = join(root, "templates", "embed");
 const brotliWasm = join(root, "node_modules", "brotli-wasm", "pkg.web", "brotli_wasm_bg.wasm");
-const cdn = "https://kitty-crow.github.io/braille-art-maker/v1/embed.js";
+const cdn = "https://kitty-crow.github.io/unicode-art-studio/v1/embed.js";
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as { version: string };
 const webVersion = pkg.version;
 
