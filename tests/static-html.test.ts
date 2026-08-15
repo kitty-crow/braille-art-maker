@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { staticArtHtml, staticPackedHtml } from "../src/embed/static-html.ts";
+import { staticArtHtml, staticPackedChunks, staticPackedHtml } from "../src/embed/static-html.ts";
+import { makeStaticArtifact } from "../src/web/static-artifact.ts";
 import type { PackedEmbed } from "../src/embed/codec.ts";
 import type { Art } from "../src/types.ts";
 
@@ -15,6 +16,22 @@ const art: Art = {
   dotsHeight: 8,
   threshold: 0.5,
   density: 0.5,
+};
+
+const densePacked = (columns: number, rows: number): PackedEmbed => {
+  const cells = columns * rows;
+  return {
+    columns,
+    rows,
+    masks: Uint8Array.from({ length: cells }, (_, index) => index & 0xff),
+    colour: true,
+    colourBackground: true,
+    fullColour: true,
+    cellColours: Array.from({ length: cells }, (_, index) => ({
+      fg: { r: index & 0xff, g: index * 3 & 0xff, b: index * 7 & 0xff },
+      bg: { r: index * 11 & 0xff, g: index * 13 & 0xff, b: index * 17 & 0xff },
+    })),
+  };
 };
 
 test("static art embed is self-contained formatted HTML with inline CSS and no JavaScript or fetching", () => {
@@ -53,27 +70,26 @@ test("static colour embed keeps foreground and background colours inline", () =>
   expect(html).not.toMatch(/<script\b/iu);
 });
 
-test("dense full-colour static output is row-bounded rather than one span per cell", () => {
-  const columns = 512;
+test("dense full-colour static output is row-bounded and chunkable", () => {
   const rows = 256;
-  const cells = columns * rows;
-  const packed: PackedEmbed = {
-    columns,
-    rows,
-    masks: Uint8Array.from({ length: cells }, (_, index) => index & 0xff),
-    colour: true,
-    colourBackground: true,
-    fullColour: true,
-    cellColours: Array.from({ length: cells }, (_, index) => ({
-      fg: { r: index & 0xff, g: index * 3 & 0xff, b: index * 7 & 0xff },
-      bg: { r: index * 11 & 0xff, g: index * 13 & 0xff, b: index * 17 & 0xff },
-    })),
-  };
-  const html = staticPackedHtml(packed);
+  const packed = densePacked(512, rows);
+  const chunks = [...staticPackedChunks(packed)];
+  expect(chunks.length).toBe(rows + 4);
+  const html = chunks.join("");
   expect((html.match(/<span\b/gu) ?? []).length).toBe(rows);
   expect((html.match(/linear-gradient\(to right/gu) ?? []).length).toBe(rows * 2);
   expect((html.match(/\n    <div style=/gu) ?? []).length).toBe(rows);
+  expect(html).toBe(staticPackedHtml(packed));
   expect(html).toContain("width:min(100%,40rem);aspect-ratio:1");
+});
+
+test("large static output streams into a Blob with only a bounded highlighted preview", async () => {
+  const artifact = await makeStaticArtifact(densePacked(640, 320));
+  expect(artifact.truncated).toBe(true);
+  expect(artifact.preview.length).toBeLessThanOrEqual(96_000);
+  expect(artifact.blob.size).toBeGreaterThan(artifact.preview.length);
+  expect(artifact.preview).toContain('aria-label="Generated Unicode art"');
+  expect(artifact.preview).toContain("\n    <div style=");
 });
 
 test("static geometry uses the same square-host limiting axis as compact runtime", () => {
@@ -88,15 +104,13 @@ test("static geometry uses the same square-host limiting axis as compact runtime
   expect(html).toContain("line-height:25.00000000cqw");
 });
 
-test("embed code view exposes Compact and No JavaScript tabs and safely highlights large static output", async () => {
+test("embed code view uses streamed static artifacts, bounded Marked preview and Blob clipboard copy", async () => {
   const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
   expect(view).toContain('this.tab("Compact", "compact", true)');
   expect(view).toContain('this.tab("No JavaScript", "static", false)');
-  expect(view).toContain("unpackEmbedSmall");
-  expect(view).toContain("staticPackedHtml(decoded)");
-  expect(view).toContain("maskCompactPayload(source) ?? maskStaticSource(source)");
-  expect(view).toContain("restoreMaskedSource(this.host, masked)");
-  expect(view).toContain('source.includes(\'aria-label="Generated Unicode art"\')');
-  expect(view).toContain('source.replace(/style="([^\\"]*)"/gu');
+  expect(view).toContain("makeStaticArtifact(decoded)");
+  expect(view).toContain("Preview truncated in the maker");
+  expect(view).toContain('new ClipboardItem({ "text/plain": artifact.blob })');
+  expect(view).toContain("safeTextFallbackBytes");
   expect(view).toContain("Building self-contained HTML…");
 });
