@@ -16,20 +16,18 @@ export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgress
   const brotli = await brotliPromise;
   const total = 3;
   let done = 0;
-  let best: { readonly mode: U4Mode; readonly bytes: Uint8Array } | null = null;
   const step = (): void => progress?.({ done: ++done, total });
-  const consider = (mode: U4Mode, bytes: Uint8Array): void => {
-    if (!best || bytes.length < best.bytes.length) best = { mode, bytes };
-  };
 
   progress?.({ done: 0, total });
-  consider("r", raw);
+  const candidates: Array<{ readonly mode: U4Mode; readonly bytes: Uint8Array }> = [];
+  candidates.push({ mode: "r", bytes: raw });
   step();
-  consider("d", deflateSync(raw, { level: 9, mem: 12 }));
+  candidates.push({ mode: "d", bytes: deflateSync(raw, { level: 9, mem: 12 }) });
   step();
-  consider("b", brotli.compress(raw, { quality: 11 }));
+  candidates.push({ mode: "b", bytes: brotli.compress(raw, { quality: 11 }) });
   step();
-  if (!best) throw new Error("No Unicode packing candidate was generated.");
+  candidates.sort((a, b) => a.bytes.length - b.bytes.length);
+  const best = candidates[0]!;
   return encodeU4Japanese(best.mode, best.bytes);
 };
 
