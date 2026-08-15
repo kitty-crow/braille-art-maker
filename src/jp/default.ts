@@ -5,6 +5,14 @@ import silentWitch from "./packs/original-ln-silent-witch-v1.xml" with { type: "
 import templates from "./packs/original-ln-templates-v1.xml" with { type: "text" };
 import { mergeCorpusPacks, parseCorpusXml } from "./corpus.ts";
 
+/*
+ * Frozen synthetic compatibility tables.
+ *
+ * These entries were historically generated/hand-authored rather than taken
+ * from traceable published prose. They MUST NOT be used for new story
+ * encodes. They remain here only so already-generated v1/v2 payloads keep
+ * decoding byte-for-byte.
+ */
 const basePack = parseCorpusXml(base);
 const courtMysteryPack = parseCorpusXml(courtMystery);
 const romanceBooksMagicPack = parseCorpusXml(romanceBooksMagic);
@@ -18,7 +26,7 @@ export const originalLnCorpusV1 = mergeCorpusPacks("original-ln-v1", [
   templatePack,
 ]);
 
-export const originalLnCorpus = mergeCorpusPacks("original-ln-v2", [
+export const originalLnCorpusV2 = mergeCorpusPacks("original-ln-v2", [
   basePack,
   courtMysteryPack,
   romanceBooksMagicPack,
