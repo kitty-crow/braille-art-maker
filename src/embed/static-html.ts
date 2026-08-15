@@ -64,7 +64,16 @@ interface StaticData {
   readonly cellColours?: readonly CellColour[];
 }
 
-const staticHtml = (data: StaticData): string => {
+const dataFromPacked = (packed: PackedEmbed): StaticData => ({
+  columns: packed.columns,
+  rows: packed.rows,
+  masks: packed.masks,
+  colour: packed.colour,
+  fullColour: packed.fullColour,
+  ...(packed.cellColours ? { cellColours: packed.cellColours } : {}),
+});
+
+function* staticChunks(data: StaticData): Generator<string> {
   const columns = Math.max(1, data.columns);
   const rows = Math.max(1, data.rows);
   const fitCells = Math.max(columns, rows * 2);
@@ -82,13 +91,15 @@ const staticHtml = (data: StaticData): string => {
   const common = `font-family:${fonts};font-weight:400;font-synthesis:none;font-variant-ligatures:none;letter-spacing:0;text-rendering:geometricPrecision`;
   const rowStyle = `display:block;width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};height:${fallbackLine};height:${cellH};line-height:${fallbackLine};line-height:${cellH};white-space:pre;overflow:visible`;
   const inkBase = `display:block;width:100%;height:100%;font-size:${fallbackFont};font-size:${fontSize};line-height:inherit;white-space:pre;overflow:visible`;
-  const rendered: string[] = new Array(rows);
+
+  yield `<div role="img" aria-label="Generated Unicode art" style="${outer}">\n`;
+  yield `  <div style="${common};width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};overflow:visible">\n`;
 
   for (let y = 0; y < rows; y += 1) {
     const offset = y * columns;
     const text = esc(rowTextFromMasks(data.masks, columns, y));
     if (!data.cellColours) {
-      rendered[y] = `<div style="${rowStyle};font-size:${fallbackFont};font-size:${fontSize}">${text}</div>`;
+      yield `    <div style="${rowStyle};font-size:${fallbackFont};font-size:${fontSize}">${text}</div>\n`;
       continue;
     }
 
@@ -96,21 +107,18 @@ const staticHtml = (data: StaticData): string => {
     const fg = gradient(data.cellColours, offset, columns, false, surfaceFg);
     const rowBg = bg ? `;background-image:${bg};background-repeat:no-repeat;background-size:100% 100%` : "";
     if (!fg) {
-      rendered[y] = `<div style="${rowStyle}${rowBg}"><span style="${inkBase}">${text}</span></div>`;
+      yield `    <div style="${rowStyle}${rowBg}"><span style="${inkBase}">${text}</span></div>\n`;
       continue;
     }
     const ink = `${inkBase};background-image:${fg};background-repeat:no-repeat;background-size:100% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent`;
-    rendered[y] = `<div style="${rowStyle}${rowBg}"><span style="${ink}">${text}</span></div>`;
+    yield `    <div style="${rowStyle}${rowBg}"><span style="${ink}">${text}</span></div>\n`;
   }
 
-  return [
-    `<div role="img" aria-label="Generated Unicode art" style="${outer}">`,
-    `  <div style="${common};width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};overflow:visible">`,
-    ...rendered.map(row => `    ${row}`),
-    "  </div>",
-    "</div>",
-  ].join("\n");
-};
+  yield "  </div>\n";
+  yield "</div>";
+}
+
+const staticHtml = (data: StaticData): string => [...staticChunks(data)].join("");
 
 /** Self-contained literal Unicode art: inline CSS only, no script/link/fetch dependency. */
 export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => staticHtml({
@@ -122,12 +130,8 @@ export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => staticHtml(
   ...(art.cellColours ? { cellColours: art.cellColours } : {}),
 });
 
-/** Avoids rebuilding a giant Art.text string when the no-JS tab already has decoded embed data. */
-export const staticPackedHtml = (packed: PackedEmbed): string => staticHtml({
-  columns: packed.columns,
-  rows: packed.rows,
-  masks: packed.masks,
-  colour: packed.colour,
-  fullColour: packed.fullColour,
-  ...(packed.cellColours ? { cellColours: packed.cellColours } : {}),
-});
+/** Formatted chunks allow the browser to stream huge static HTML without one giant JS string. */
+export const staticPackedChunks = (packed: PackedEmbed): Generator<string> => staticChunks(dataFromPacked(packed));
+
+/** Convenience string form retained for API/tests and modest payloads. */
+export const staticPackedHtml = (packed: PackedEmbed): string => staticHtml(dataFromPacked(packed));
