@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { decodeU4, encodeU4, encodeU4J, type U4Mode } from "../src/embed/codec.ts";
+import { japaneseCompactPrefix } from "../src/embed/japanese.ts";
 import { j8192Alphabet, j8192Decode, j8192Encode, type J8192Remainder } from "../src/embed/j8192.ts";
 import { packEmbedSmall, unpackEmbedSmall } from "../src/embed/small-bun.ts";
 import { Tpl } from "../src/embed/tpl.ts";
@@ -42,7 +43,7 @@ test("J8192 round-trips every 13-bit tail state exactly", () => {
   }
 });
 
-test("u4 marks J8192 explicitly and decodes all compression modes", () => {
+test("legacy u4 J8192 markers decode all compression modes", () => {
   for (const mode of ["r", "d", "b"] as const satisfies readonly U4Mode[]) {
     for (const length of [1, 2, 3, 4, 5, 13, 96]) {
       const source = bytes(length);
@@ -55,7 +56,7 @@ test("u4 marks J8192 explicitly and decodes all compression modes", () => {
   }
 });
 
-test("J8192 is approximately half the basE91 character count", () => {
+test("legacy J8192 remains approximately half the basE91 character count", () => {
   const source = bytes(13_312);
   const base91 = encodeU4("b", source);
   const japanese = encodeU4J("b", source);
@@ -63,17 +64,19 @@ test("J8192 is approximately half the basE91 character count", () => {
   expect(decodeU4(japanese).bytes).toEqual(source);
 });
 
-test("u4 optimiser selects J8192 for representative art and remains lossless", async () => {
+test("current Compact emits Japanese prose and remains lossless for representative art", async () => {
   const source = noisyArt();
   const packed = await packEmbedSmall(source, {});
-  expect(packed).toMatch(/^&[JKL][0-9ABC]/u);
+  expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
+  expect(packed).not.toMatch(/^&[JKL][0-9ABC]/u);
+  expect(packed).not.toMatch(/[\r\n]/u);
   const decoded = await unpackEmbedSmall(packed, "u4");
   expect(decoded.columns).toBe(source.columns);
   expect(decoded.rows).toBe(source.rows);
   expect(decoded.masks.length).toBe(source.columns * source.rows);
 });
 
-test("embed template accepts marked J8192 and rejects arbitrary payload characters", () => {
+test("embed template accepts legacy marked J8192 and rejects arbitrary payload characters", () => {
   const payload = encodeU4J("b", bytes(96));
   const html = new Tpl().make({
     data: payload,
