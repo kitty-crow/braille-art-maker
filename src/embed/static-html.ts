@@ -103,7 +103,13 @@ const staticHtml = (data: StaticData): string => {
     rendered[y] = `<div style="${rowStyle}${rowBg}"><span style="${ink}">${text}</span></div>`;
   }
 
-  return `<div role="img" aria-label="Generated Unicode art" style="${outer}"><div style="${common};width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};overflow:visible">${rendered.join("")}</div></div>`;
+  return [
+    `<div role="img" aria-label="Generated Unicode art" style="${outer}">`,
+    `  <div style="${common};width:${(columns * fallbackCell).toFixed(4)}px;width:${gridWidth};overflow:visible">`,
+    ...rendered.map(row => `    ${row}`),
+    "  </div>",
+    "</div>",
+  ].join("\n");
 };
 
 /** Self-contained literal Unicode art: inline CSS only, no script/link/fetch dependency. */
