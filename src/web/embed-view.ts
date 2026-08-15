@@ -1,15 +1,12 @@
 import type { EmbedCodec } from "../embed/codec.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
-import { originalLnCorpus } from "../jp/default.ts";
-import { foldJ8192Entropy, j8192EntropyValues } from "../jp/j8192-entropy.ts";
-import { entropy13, japaneseRamble } from "../jp/ramble.ts";
 import { makeStaticArtifact, type StaticArtifact } from "./static-artifact.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
-type Mode = "compact" | "static" | "ramble";
+type Mode = "compact" | "static";
 interface MaskedPayload { readonly source: string; readonly token: string; readonly payload: string; }
 
 const src = {
@@ -109,7 +106,13 @@ const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean
 
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const envelope = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]')?.textContent?.trim() ?? "";
+  const script = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]');
+  const envelope = script?.textContent?.trim() ?? "";
+  const explicit = script?.dataset.codec;
+  if (explicit === "u1" || explicit === "u2" || explicit === "u3" || explicit === "u4") {
+    if (!envelope) throw new Error("Compact embed payload is empty.");
+    return { codec: explicit, data: envelope };
+  }
   const digit = envelope[0];
   if (digit !== "1" && digit !== "2" && digit !== "3" && digit !== "4") throw new Error("Compact embed payload is missing its codec marker.");
   if (envelope.length < 2) throw new Error("Compact embed payload is empty.");
@@ -124,19 +127,16 @@ export class EmbedView {
   private staticArtifact: StaticArtifact | null = null;
   private readonly compactTab: HTMLButtonElement;
   private readonly staticTab: HTMLButtonElement;
-  private readonly rambleTab: HTMLButtonElement;
 
   constructor(private readonly host: HTMLElement) {
     const tabs = document.createElement("div");
     tabs.className = "embed-code-tabs";
     tabs.setAttribute("role", "tablist");
-    tabs.setAttribute("aria-label", "Embed presentation");
+    tabs.setAttribute("aria-label", "Embed format");
     this.compactTab = this.tab("Compact", "compact", true);
     this.staticTab = this.tab("No JavaScript", "static", false);
-    this.rambleTab = this.tab("Japanese Ramble", "ramble", false);
-    tabs.append(this.compactTab, this.staticTab, this.rambleTab);
+    tabs.append(this.compactTab, this.staticTab);
     host.before(tabs);
-    host.dataset.mode = "compact";
 
     const copy = document.querySelector<HTMLButtonElement>("#copy-embed");
     copy?.addEventListener("click", event => {
@@ -156,7 +156,6 @@ export class EmbedView {
       return;
     }
     if (this.mode === "static") void this.showStatic();
-    else if (this.mode === "ramble") this.renderRamble(source);
     else this.renderCode(source);
   }
 
@@ -169,7 +168,6 @@ export class EmbedView {
     button.setAttribute("aria-selected", String(selected));
     button.dataset.mode = mode;
     if (mode === "static") button.title = "Self-contained HTML with inline CSS only: no JavaScript, external scripts, stylesheets or fetching.";
-    if (mode === "ramble") button.title = "Deterministic local Japanese presentation of the unchanged compact payload. Copy embed still copies the compact data.";
     button.addEventListener("click", () => this.select(mode));
     return button;
   }
@@ -177,37 +175,14 @@ export class EmbedView {
   private select(mode: Mode): void {
     if (this.mode === mode) return;
     this.mode = mode;
-    this.host.dataset.mode = mode;
     this.compactTab.setAttribute("aria-selected", String(mode === "compact"));
     this.staticTab.setAttribute("aria-selected", String(mode === "static"));
-    this.rambleTab.setAttribute("aria-selected", String(mode === "ramble"));
     if (!this.compact) {
       this.host.replaceChildren();
       return;
     }
     if (mode === "compact") this.renderCode(this.compact);
-    else if (mode === "ramble") this.renderRamble(this.compact);
     else void this.showStatic();
-  }
-
-  private renderRamble(source: string): void {
-    try {
-      const packed = packedSource(source);
-      if (packed.codec !== "u4") throw new Error("Japanese ramble requires a current u4 compact embed.");
-      const values = j8192EntropyValues(packed.data);
-      const sentences = Math.max(6, Math.min(64, Math.ceil(Math.log2(values.length + 1) * 3)));
-      const folded = foldJ8192Entropy(values, Math.max(48, sentences * 8));
-      const ramble = japaneseRamble(originalLnCorpus, entropy13(folded), { sentences });
-      const pre = document.createElement("pre");
-      const code = document.createElement("code");
-      code.lang = "ja";
-      code.textContent = ramble;
-      pre.append(code);
-      this.host.replaceChildren(pre);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Japanese ramble generation failed.";
-      this.message(message);
-    }
   }
 
   private staticPreview(artifact: StaticArtifact): string {

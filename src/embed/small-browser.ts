@@ -1,7 +1,7 @@
 import brotliPromise from "brotli-wasm";
 import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { decodeU3, decodeU4, encodeU4, encodeU4J, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
+import { decodeU3, decodeU4, encodeU4Japanese, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
 import { isUltraRaw, unpackUltra } from "./ultra-raw.ts";
 import { packU4, type PackProgressFn } from "./ultra-search.ts";
 
@@ -16,22 +16,21 @@ export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgress
   const brotli = await brotliPromise;
   const total = 3;
   let done = 0;
-  let best = "";
+  let best: { readonly mode: U4Mode; readonly bytes: Uint8Array } | null = null;
   const step = (): void => progress?.({ done: ++done, total });
-  const consider = (value: string): void => { if (!best || value.length < best.length) best = value; };
-  const considerTransports = (mode: U4Mode, bytes: Uint8Array): void => {
-    consider(encodeU4(mode, bytes));
-    consider(encodeU4J(mode, bytes));
+  const consider = (mode: U4Mode, bytes: Uint8Array): void => {
+    if (!best || bytes.length < best.bytes.length) best = { mode, bytes };
   };
 
   progress?.({ done: 0, total });
-  considerTransports("r", raw);
+  consider("r", raw);
   step();
-  considerTransports("d", deflateSync(raw, { level: 9, mem: 12 }));
+  consider("d", deflateSync(raw, { level: 9, mem: 12 }));
   step();
-  considerTransports("b", brotli.compress(raw, { quality: 11 }));
+  consider("b", brotli.compress(raw, { quality: 11 }));
   step();
-  return best;
+  if (!best) throw new Error("No Unicode packing candidate was generated.");
+  return encodeU4Japanese(best.mode, best.bytes);
 };
 
 export const unpackEmbedSmall = async (source: string, codec: EmbedCodec): Promise<PackedEmbed> => {

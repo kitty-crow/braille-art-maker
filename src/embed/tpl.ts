@@ -1,6 +1,7 @@
 import { base85Alphabet } from "./base85.ts";
 import { base91Alphabet } from "./base91.ts";
 import { cjk4096Range } from "./cjk4096.ts";
+import { isJapaneseCompactPayload } from "./japanese.ts";
 import { j8192Alphabet } from "./j8192.ts";
 import type { EmbedCodec } from "./codec.ts";
 import type { EmbedCfg, EmbedTpl } from "./types.ts";
@@ -16,8 +17,11 @@ const cjk4096 = (value: string): boolean => [...value].every(char => {
 
 export class Tpl {
   make(cfg: EmbedCfg, tpl: EmbedTpl): string {
+    const explicitCodec = tpl.html.includes("{{CODEC}}");
+    const data = this.data(cfg.data, cfg.codec);
     return this.fill(tpl.html, {
-      DATA: this.envelope(cfg.data, cfg.codec),
+      DATA: explicitCodec ? data : this.envelope(data, cfg.codec),
+      CODEC: cfg.codec,
       THEME: cfg.theme,
       SURFACE: cfg.surface,
       STYLE: this.attr(cfg.style ?? STYLE),
@@ -27,7 +31,7 @@ export class Tpl {
   }
 
   private envelope(value: string, codec: EmbedCodec): string {
-    return `${codec.slice(1)}${this.data(value, codec)}`;
+    return `${codec.slice(1)}${value}`;
   }
 
   private data(value: string, codec: EmbedCodec): string {
@@ -37,6 +41,10 @@ export class Tpl {
       return value;
     }
     if (codec === "u4") {
+      if (isJapaneseCompactPayload(value)) {
+        if (/[<>&\r\n]/u.test(value)) throw new Error("Embed payload contains unsafe Japanese compact data.");
+        return value;
+      }
       if (/^&[JKL][0-9ABC]/u.test(value)) {
         const body = value.slice(3);
         if (!body || [...body].some(char => !j8192.has(char))) throw new Error("Embed payload contains unsafe J8192 data.");

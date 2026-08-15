@@ -1,5 +1,6 @@
 import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
+import { decodeJapaneseCompact, encodeJapaneseCompact, isJapaneseCompactPayload } from "./japanese.ts";
 import { base85Decode, base85Encode } from "./base85.ts";
 import { base91Decode, base91Encode } from "./base91.ts";
 import { cjk4096Decode, cjk4096Encode, type Cjk4096Remainder } from "./cjk4096.ts";
@@ -74,15 +75,20 @@ export const encodeU4Cjk = (mode: U4Mode, bytes: Uint8Array): string => {
   return `&${mode.toUpperCase()}${encoded.remainder}${encoded.body}`;
 };
 
+// Legacy 0.4.29 J8192 encoder remains available for source/backward compatibility.
 export const encodeU4J = (mode: U4Mode, bytes: Uint8Array): string => {
   const encoded = j8192Encode(bytes);
   const marker = mode === "r" ? "J" : mode === "d" ? "K" : "L";
   return `&${marker}${jRemainders[encoded.remainder]}${encoded.body}`;
 };
 
+// Current Compact transport: the payload itself is reversible Japanese prose.
+export const encodeU4Japanese = (mode: U4Mode, bytes: Uint8Array): string => encodeJapaneseCompact(mode, bytes);
+
 export const decodeU4 = (source: string): { mode: U4Mode; bytes: Uint8Array } => {
   const text = source.trim();
   if (!text) throw new Error("Packed Unicode u4 payload is empty.");
+  if (isJapaneseCompactPayload(text)) return decodeJapaneseCompact(text);
   if (!text.startsWith("&")) return { mode: "b", bytes: base91Decode(text) };
 
   const marker = text[1];
