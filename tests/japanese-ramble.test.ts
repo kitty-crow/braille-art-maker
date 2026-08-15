@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { originalLnCorpus } from "../src/jp/default.ts";
 import { entropy13, japaneseRamble } from "../src/jp/ramble.ts";
+
+const root = join(import.meta.dir, "..");
 
 test("bundled Japanese corpus is local, sizeable and structurally complete", () => {
   expect(originalLnCorpus.id).toBe("original-ln-v1");
@@ -31,4 +35,18 @@ test("ramble caps requested output without changing the corpus", () => {
   const out = japaneseRamble(originalLnCorpus, entropy13([99]), { sentences: 500 });
   expect(out.split("\n")).toHaveLength(64);
   expect(originalLnCorpus.entries.length).toBeGreaterThanOrEqual(200);
+});
+
+test("maker exposes Japanese Ramble as a local presentation without changing copy semantics", async () => {
+  const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
+  const local = await Promise.all([
+    "default.ts", "corpus.ts", "j8192-entropy.ts", "ramble.ts",
+  ].map(name => readFile(join(root, "src", "jp", name), "utf8")));
+  expect(view).toContain('this.rambleTab = this.tab("Japanese Ramble", "ramble", false);');
+  expect(view).toContain('this.renderRamble(this.compact);');
+  expect(view).toContain('j8192EntropyValues(packed.data)');
+  expect(view).toContain('japaneseRamble(originalLnCorpus');
+  expect(view).toContain('if (this.mode !== "static") return;');
+  expect(view).toContain('Copy embed still copies the compact data.');
+  for (const source of local) expect(source).not.toContain("fetch(");
 });
