@@ -25,3 +25,18 @@ export const j8192EntropyValues = (payload: string): number[] => {
   if (values.length === 0) throw new Error("Japanese ramble requires a non-empty u4 payload.");
   return values;
 };
+
+// Fold the whole payload into a bounded presentation stream. Every source symbol contributes,
+// so large embeds do not need a correspondingly enormous DOM just to show their prose skin.
+export const foldJ8192Entropy = (values: readonly number[], width: number): number[] => {
+  if (values.length === 0) throw new Error("Japanese ramble entropy is empty.");
+  const size = Math.max(1, Math.min(values.length, Math.round(width)));
+  const out = new Array<number>(size).fill(0);
+  for (let i = 0; i < values.length; i += 1) {
+    const slot = i % size;
+    const salt = Math.imul(i + 1, 0x45d9f3b) >>> 0;
+    const rotated = ((values[i]! << (i % 7)) | (values[i]! >>> (13 - (i % 7 || 13)))) & 0x1fff;
+    out[slot] = (out[slot]! ^ rotated ^ salt) & 0x1fff;
+  }
+  return out;
+};
