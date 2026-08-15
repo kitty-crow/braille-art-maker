@@ -2,16 +2,16 @@ import { expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { brotliCompressSync, constants } from "node:zlib";
-import { taggedText } from "../src/colour/tagged.ts";
 import { parseArgs } from "../src/cli/args.ts";
 import { bestRaw, embedCodec, encodeU3, packEmbed, unpackEmbed } from "../src/embed/codec.ts";
+import { japaneseCompactPrefix } from "../src/embed/japanese.ts";
 import { packRawV2Candidates } from "../src/embed/raw.ts";
 import { packEmbedSmall, unpackEmbedSmall } from "../src/embed/small-bun.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 import type { Art, ArtCfg, CellColour } from "../src/types.ts";
 
 const root = join(import.meta.dir, "..");
-const template = `<div data-unicode-art data-theme="{{THEME}}" data-surface="{{SURFACE}}" style="{{STYLE}}" aria-label="{{LABEL}}"><script type="application/octet-stream" data-unicode-art-data>{{DATA}}</script><script src="{{LOAD_SRC}}"></script></div>`;
+const template = `<div data-unicode-art data-theme="{{THEME}}" data-surface="{{SURFACE}}" style="{{STYLE}}" aria-label="{{LABEL}}"><script type="application/octet-stream" data-unicode-art-data data-codec="{{CODEC}}">{{DATA}}</script><script src="{{LOAD_SRC}}"></script></div>`;
 const colours: CellColour[] = [
   { fg: { r: 240, g: 90, b: 140 } }, { fg: { r: 240, g: 90, b: 140 } },
   { fg: { r: 90, g: 80, b: 210 }, bg: { r: 20, g: 18, b: 25 } }, { fg: { r: 90, g: 80, b: 210 }, bg: { r: 20, g: 18, b: 25 } },
@@ -130,24 +130,27 @@ test("u4 searches exact representations and remains lossless", async () => {
   expect(decoded.rows).toBe(art.rows);
   expect([...decoded.masks]).toEqual([255, 255, 63, 63, 255, 255, 0, 0]);
   expect(decoded.cellColours).toEqual(colours);
+  expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
+  expect(packed).not.toMatch(/[\r\n]/u);
   expect(packed).not.toContain("⣿");
   expect(packed).not.toContain("<#");
   expect(packed).not.toContain("<");
   expect(packed).not.toContain(">");
 });
 
-test("u4 beats or matches u3 on representative art", async () => {
+test("current Compact Japanese transport remains lossless across representative art", async () => {
   const cases: readonly [Art, ArtCfg][] = [
     [repeatedArt(), {}],
     [gradientArt(), { colour: true }],
     [fullColourArt(), { colour: true, colourBackground: true, fullColour: true }],
   ];
   for (const [source, config] of cases) {
-    const u3 = packU3(source, config);
-    const u4 = await packEmbedSmall(source, config);
-    expect(u4.length).toBeLessThanOrEqual(u3.length);
-    const decoded = await unpackEmbedSmall(u4, "u4");
-    expect(decoded.masks).toEqual((await unpackEmbedSmall(u3, "u3")).masks);
+    const packed = await packEmbedSmall(source, config);
+    expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
+    expect(packed).not.toMatch(/[\r\n]/u);
+    const decoded = await unpackEmbedSmall(packed, "u4");
+    expect(decoded.columns).toBe(source.columns);
+    expect(decoded.rows).toBe(source.rows);
     expect(decoded.cellColours).toEqual(source.cellColours);
   }
 });
@@ -169,13 +172,16 @@ test("u2 deflates the packed binary before base64url encoding", () => {
   expect(unpackEmbed(u2, "u2").masks).toEqual(unpackEmbed(u1, "u1").masks);
 });
 
-test("compact embed payload stays smaller than literal tagged JSON", async () => {
+test("Compact payload is safe single-line Japanese and lossless", async () => {
   const packed = await packEmbedSmall(art, cfg);
-  const literal = JSON.stringify({ text: taggedText(art), columns: art.columns, rows: art.rows, colour: true, colourBackground: true, fullColour: false });
-  expect(packed.length).toBeLessThan(literal.length);
+  expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
+  expect(packed).not.toMatch(/[\r\n<>&]/u);
+  const decoded = await unpackEmbedSmall(packed, "u4");
+  expect(decoded.masks).toEqual(Uint8Array.from([255, 255, 63, 63, 255, 255, 0, 0]));
+  expect(decoded.cellColours).toEqual(colours);
 });
 
-test("new embed shell keeps only host, payload and loader", async () => {
+test("new embed shell keeps host, pure Japanese payload, codec metadata and loader", async () => {
   const packed = await packEmbedSmall(art, cfg);
   const html = new Tpl().make({
     data: packed,
@@ -187,14 +193,15 @@ test("new embed shell keeps only host, payload and loader", async () => {
   const shipped = await readFile(join(root, "templates", "embed", "embed.html"), "utf8");
   expect(html).toContain("<div data-unicode-art");
   expect(html).toContain('type="application/octet-stream"');
-  expect(html).toContain(`>4${packed}</script>`);
+  expect(html).toContain(`data-unicode-art-data data-codec="u4">${packed}</script>`);
+  expect(html).not.toContain(`>4${packed}</script>`);
   expect(html).toContain("https://example.test/v1/load.js");
-  expect(html).not.toContain("data-codec=");
+  expect(html).toContain('data-codec="u4"');
   expect(html).not.toContain("data-api=");
   expect(html).not.toContain("embed.css");
   expect(html).not.toContain("<template");
   expect(shipped).not.toContain("<template");
-  expect(shipped).not.toContain("data-codec=");
+  expect(shipped).toContain('data-codec="{{CODEC}}"');
   expect(html).not.toContain("⣿");
   expect(html).not.toContain("<#");
 });
@@ -223,7 +230,7 @@ test("build publishes the CDN runtime, worker and Brotli assets", async () => {
   expect(css).toContain("font-synthesis: none");
 });
 
-test("embed runtime accepts legacy and self-identifying u1 through u4 in shadow DOM", async () => {
+test("embed runtime accepts legacy and explicit-codec u1 through u4 in shadow DOM", async () => {
   const runtime = await readFile(join(root, "src", "embed", "runtime.ts"), "utf8");
   expect(runtime).toContain('const codecFromMarker = (marker: string): EmbedCodec | null');
   expect(runtime).toContain('explicit === "u1" || explicit === "u2" || explicit === "u3" || explicit === "u4"');
