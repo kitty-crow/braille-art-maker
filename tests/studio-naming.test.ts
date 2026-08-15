@@ -4,7 +4,6 @@ import { extname, join, relative } from "node:path";
 
 const root = join(import.meta.dir, "..");
 const textExt = new Set([".ts", ".md", ".html", ".css", ".svg", ".json"]);
-const externalRepoSlug = "braille-art-maker";
 
 const files = async (path: string): Promise<string[]> => {
   const out: string[] = [];
@@ -27,8 +26,8 @@ test("owned product code and documentation consistently use Studio, not Maker", 
   ];
   const stale: string[] = [];
   for (const path of paths) {
-    const source = (await readFile(path, "utf8")).replaceAll(externalRepoSlug, "external-repo");
-    if (/\bmaker\b/iu.test(source) || source.includes("unicode-art-maker")) stale.push(relative(root, path));
+    const source = await readFile(path, "utf8");
+    if (/\bmaker\b/iu.test(source) || source.includes("unicode-art-maker") || source.includes("braille-art-maker")) stale.push(relative(root, path));
   }
   expect(stale).toEqual([]);
 });
