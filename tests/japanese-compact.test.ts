@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { decodeU4, encodeU4Japanese, type U4Mode } from "../src/embed/codec.ts";
 import { decodeJapaneseCompact, encodeJapaneseCompact, japaneseCompactPrefix } from "../src/embed/japanese.ts";
-import { originalLnCorpus, originalLnCorpusV1 } from "../src/jp/default.ts";
+import { authenticJapaneseSentences, authenticJapaneseSources } from "../src/jp/authentic.ts";
+import { originalLnCorpusV1, originalLnCorpusV2 } from "../src/jp/default.ts";
 import { Tpl } from "../src/embed/tpl.ts";
 
 const modes: readonly U4Mode[] = ["r", "d", "b"];
@@ -31,23 +32,53 @@ test("story payload is single-line and reversible", () => {
   }
 });
 
-test("current story transport carries the v2 prose marker", () => {
+test("current story transport is the authentic Aozora v3 corpus", () => {
   const encoded = encodeJapaneseCompact("r", Uint8Array.of(1, 2, 3));
-  expect(encoded).toContain("静かな魔法の気配が、物語の奥で揺れている。");
+  expect(encoded).toContain("【青空文庫コーパス第三版】");
+  expect(encoded).not.toContain("静かな魔法の気配が、物語の奥で揺れている。");
   expect(decodeJapaneseCompact(encoded).bytes).toEqual(Uint8Array.of(1, 2, 3));
 });
 
-test("silent-witch vocabulary is added without mutating the legacy corpus", () => {
-  const current = new Set(originalLnCorpus.entries.map(entry => entry.text));
-  const legacy = new Set(originalLnCorpusV1.entries.map(entry => entry.text));
+test("every active story sentence has explicit public-domain provenance", () => {
+  expect(authenticJapaneseSentences).toHaveLength(64);
+  const sourceIds = new Set<string>(authenticJapaneseSources.map(source => source.id));
+  expect(sourceIds.size).toBe(authenticJapaneseSources.length);
+  for (const source of authenticJapaneseSources) {
+    expect(source.status).toBe("public-domain");
+    expect(source.card).toMatch(/^https:\/\/www\.aozora\.gr\.jp\/cards\//u);
+  }
+  for (const entry of authenticJapaneseSentences) {
+    expect(sourceIds.has(entry.source)).toBe(true);
+    expect(entry.text.length).toBeGreaterThan(0);
+  }
+  for (const source of authenticJapaneseSources) {
+    expect(authenticJapaneseSentences.filter(entry => entry.source === source.id)).toHaveLength(16);
+  }
+});
+
+test("synthetic v1 and v2 tables are frozen for decoding, not active encoding", () => {
+  const v1 = new Set<string>(originalLnCorpusV1.entries.map(entry => entry.text));
+  const v2 = new Set<string>(originalLnCorpusV2.entries.map(entry => entry.text));
+  const active = new Set<string>(authenticJapaneseSentences.map(entry => entry.text));
   for (const text of [
     "人前が苦手な魔術師",
     "王立魔術学院",
     "術式を書いたノート",
     "声に出さなくても術式は成立します",
   ]) {
-    expect(current.has(text)).toBe(true);
-    expect(legacy.has(text)).toBe(false);
+    expect(v2.has(text)).toBe(true);
+    expect(v1.has(text)).toBe(false);
+    expect(active.has(text)).toBe(false);
+  }
+});
+
+test("active authentic sentence bank is unique and prefix-free", () => {
+  const sentences = authenticJapaneseSentences.map(entry => entry.text);
+  expect(new Set(sentences).size).toBe(sentences.length);
+  for (let i = 0; i < sentences.length; i += 1) {
+    for (let j = 0; j < sentences.length; j += 1) {
+      if (i !== j) expect(sentences[j]!.startsWith(sentences[i]!)).toBe(false);
+    }
   }
 });
 

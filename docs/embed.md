@@ -32,13 +32,17 @@ J8192 may look Japanese, but it is not prose and it does not describe the image.
 
 The Studio's Compact panel includes **Payload as a story**. When checked, the exact same compressed image bytes are encoded as deterministic Japanese prose instead of basE91/J8192.
 
-The prose is the payload. Grammar-template selection and the selected people, places, objects, verbs and other lexical choices are mixed-radix digits. Decoding those choices reconstructs the exact compression mode and exact byte stream before normal `u4` unpacking. The payload remains one physical line inside `data-unicode-art-data`; changing the prose changes or corrupts the image.
+For current v3 story payloads, every data-carrying prose unit is a complete sentence copied from a traceable public-domain Japanese work. The active bank contains exactly 64 sentences, each representing one radix-64 digit. Concatenating those authored sentences encodes the framed byte value; decoding the sentence choices reconstructs the exact compression mode and exact byte stream before normal `u4` unpacking. The payload remains one physical line inside `data-unicode-art-data`; changing the prose changes or corrupts the image.
 
-"Light-novel encoding" is a description of the resulting style, not an AI interpretation of the PNG. No model looks at the picture and writes a story about it. The encoder deterministically chooses grammatical templates and words because each choice carries part of the binary value. The resulting surreal prose is therefore both readable-looking text and the actual reversible data representation.
+"Light-novel encoding" describes the readable Japanese transport, not an AI interpretation of the PNG. No model looks at the picture and writes a story, and the active encoder does not generate, paraphrase, fill templates or invent genre vocabulary. It selects whole published sentences because each sentence is a reversible data symbol.
 
-The grammar and lexicon are bundled locally as XML. Story mode performs no corpus fetch and calls no corpus API. It is intentionally larger than super-compact mode because grammatical Japanese carries fewer payload bits per visible character.
+The active source bank is bundled locally in `src/jp/authentic.ts` with provenance for every sentence. It currently uses public-domain works distributed by Aozora Bunko: 夏目漱石『夢十夜』, 宮沢賢治『よだかの星』, 宮沢賢治『注文の多い料理店』 and 芥川龍之介『羅生門』. Only Aozora ruby/control markup is removed; the sentence wording is not rewritten. Story mode performs no corpus fetch and calls no corpus API at runtime.
 
-Large story payloads use bounded chapters. At most 256 framed bytes are converted to any one `BigInt`, then the resulting Japanese chapters are joined by a fixed Japanese transition phrase. This avoids the unbounded whole-payload `BigInt` allocation that previously failed on very large images while keeping the complete payload single-line and reversible. The decoder also accepts the original 0.4.35 whole-payload story format.
+The older XML grammar packs are not active corpus sources. They were synthetic historical tables and are frozen solely for decoding story payloads produced by earlier releases, including the short-lived v2 Silent-Witch-inspired table. New encodes cannot select any of those synthetic entries.
+
+Large story payloads use bounded chapters. At most 256 framed bytes are converted to any one `BigInt`, then the resulting Japanese chapters are joined by a fixed Japanese transition phrase. This avoids the unbounded whole-payload `BigInt` allocation that previously failed on very large images while keeping the complete payload single-line and reversible. The decoder also accepts the original 0.4.35 whole-payload story format and the later v1/v2 chunked formats.
+
+See [Story corpus provenance](story-corpus.md) for the active works, source cards and contribution rule.
 
 ### Compatibility
 
@@ -46,7 +50,7 @@ Old `u4` payloads remain valid. Unmarked Brotli basE91 and the existing `&r` / `
 
 New fragments keep only the outer host configuration, one self-identifying payload script and one loader script in the copied HTML. The Shadow DOM scaffold and stylesheet link are reconstructed by `embed.js`, and `load.js` derives the API URL from its own URL. Static template markup is therefore not repeated in every embed.
 
-The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2`, `u3`, previous basE91 `u4`, CJK-4096, J8192 and original story payloads, so previously copied embeds continue to work.
+The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2`, `u3`, previous basE91 `u4`, CJK-4096, J8192 and all earlier story payload versions, so previously copied embeds continue to work.
 
 Tests verify that the complete J8192 alphabet is unchanged by NFC, NFD, NFKC and NFKD normalisation; the legacy CJK-4096 normalisation tests remain in place as well.
 
