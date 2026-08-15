@@ -7,7 +7,8 @@ interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
 type Mode = "compact" | "static";
-interface MaskedPayload { readonly source: string; readonly token: string; readonly payload: string; }
+interface MaskedPart { readonly payload: string; readonly className?: string; }
+interface MaskedSource { readonly source: string; readonly parts: readonly MaskedPart[]; }
 
 const src = {
   marked: "https://cdn.jsdelivr.net/npm/marked@18.0.7/lib/marked.umd.js",
@@ -16,7 +17,8 @@ const src = {
 } as const;
 const loads = new Map<string, Promise<void>>();
 const richHighlightLimit = 96_000;
-const payloadToken = "__UNICODE_ART_PACKED_PAYLOAD__";
+const tokenPrefix = "__UNICODE_ART_MASK_";
+const token = (index: number): string => `${tokenPrefix}${index}__`;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -64,7 +66,7 @@ const fence = (value: string): string => {
   return "`".repeat(Math.max(3, longest + 1));
 };
 
-const maskCompactPayload = (source: string): MaskedPayload | null => {
+const maskCompactPayload = (source: string): MaskedSource | null => {
   const marker = source.indexOf("data-unicode-art-data");
   if (marker < 0) return null;
   const open = source.lastIndexOf("<script", marker);
@@ -74,33 +76,63 @@ const maskCompactPayload = (source: string): MaskedPayload | null => {
   const payload = source.slice(start + 1, end);
   if (!payload) return null;
   return {
-    source: `${source.slice(0, start + 1)}${payloadToken}${source.slice(end)}`,
-    token: payloadToken,
-    payload,
+    source: `${source.slice(0, start + 1)}${token(0)}${source.slice(end)}`,
+    parts: [{ payload, className: "hljs-string" }],
   };
 };
 
-const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean => {
+const maskStaticSource = (source: string): MaskedSource | null => {
+  if (!source.includes('aria-label="Generated Unicode art"')) return null;
+  const parts: MaskedPart[] = [];
+  const add = (payload: string): string => {
+    const index = parts.length;
+    parts.push({ payload });
+    return token(index);
+  };
+  let masked = source.replace(/style="([^"]*)"/gu, (_whole, value: string) => `style="${add(value)}"`);
+  masked = masked.replace(/[\u2800-\u28ff]{32,}/gu, value => add(value));
+  return parts.length > 0 ? { source: masked, parts } : null;
+};
+
+const restoreMaskedSource = (host: HTMLElement, masked: MaskedSource): boolean => {
+  const nodes: Text[] = [];
   const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
-    const text = node as Text;
-    const at = text.data.indexOf(masked.token);
-    if (at >= 0) {
-      const fragment = document.createDocumentFragment();
-      if (at > 0) fragment.append(document.createTextNode(text.data.slice(0, at)));
-      const payload = document.createElement("span");
-      payload.className = "hljs-string";
-      payload.textContent = masked.payload;
-      fragment.append(payload);
-      const after = text.data.slice(at + masked.token.length);
-      if (after) fragment.append(document.createTextNode(after));
-      text.replaceWith(fragment);
-      return true;
-    }
+    if ((node as Text).data.includes(tokenPrefix)) nodes.push(node as Text);
     node = walker.nextNode();
   }
-  return false;
+
+  let restored = 0;
+  for (const text of nodes) {
+    const source = text.data;
+    const pattern = /__UNICODE_ART_MASK_(\d+)__/gu;
+    let match: RegExpExecArray | null;
+    let at = 0;
+    const fragment = document.createDocumentFragment();
+    let changed = false;
+    while ((match = pattern.exec(source)) !== null) {
+      const index = Number(match[1]);
+      const part = masked.parts[index];
+      if (!part) continue;
+      if (match.index > at) fragment.append(document.createTextNode(source.slice(at, match.index)));
+      if (part.className) {
+        const span = document.createElement("span");
+        span.className = part.className;
+        span.textContent = part.payload;
+        fragment.append(span);
+      } else {
+        fragment.append(document.createTextNode(part.payload));
+      }
+      at = match.index + match[0].length;
+      restored += 1;
+      changed = true;
+    }
+    if (!changed) continue;
+    if (at < source.length) fragment.append(document.createTextNode(source.slice(at)));
+    text.replaceWith(fragment);
+  }
+  return restored === masked.parts.length;
 };
 
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
@@ -219,7 +251,7 @@ export class EmbedView {
   private renderCode(source: string): void {
     const generation = ++this.renderGeneration;
     if (source.length > richHighlightLimit) {
-      const masked = maskCompactPayload(source);
+      const masked = maskCompactPayload(source) ?? maskStaticSource(source);
       if (masked) {
         void this.marked(source, generation, masked);
         return;
@@ -230,7 +262,7 @@ export class EmbedView {
     void this.marked(source, generation);
   }
 
-  private async marked(source: string, generation: number, masked?: MaskedPayload): Promise<void> {
+  private async marked(source: string, generation: number, masked?: MaskedSource): Promise<void> {
     try {
       const api = await libs();
       if (generation !== this.renderGeneration) return;
@@ -242,7 +274,7 @@ export class EmbedView {
       const blocks = this.host.querySelectorAll<HTMLElement>("pre code");
       if (blocks.length === 0) { this.plain(source); return; }
       blocks.forEach(block => api.highlight.highlightElement(block));
-      if (masked && !restoreMaskedPayload(this.host, masked)) this.plain(source);
+      if (masked && !restoreMaskedSource(this.host, masked)) this.plain(source);
     } catch {
       if (generation === this.renderGeneration) this.plain(source);
     }
