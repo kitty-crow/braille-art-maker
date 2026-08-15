@@ -1,7 +1,11 @@
+import { finishCacheRestore } from "./cache-guard.ts";
+
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
+
+declare const __WEB_VERSION__: string;
 
 const src = {
   marked: "https://cdn.jsdelivr.net/npm/marked@18.0.7/lib/marked.umd.js",
@@ -9,6 +13,7 @@ const src = {
   highlight: "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js",
 } as const;
 const loads = new Map<string, Promise<void>>();
+const richHighlightLimit = 96_000;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -62,7 +67,18 @@ export class EmbedView {
 
   render(source: string): void {
     const generation = ++this.generation;
-    if (!source) { this.host.replaceChildren(); return; }
+    if (!source) {
+      this.host.replaceChildren();
+      finishCacheRestore(__WEB_VERSION__);
+      return;
+    }
+    // Syntax-highlighting a multi-megabyte packed embed duplicates the source several times
+    // through Markdown parsing, sanitising and token spans. Keep huge payloads as one plain
+    // text node instead; the copied embed remains byte-for-byte identical.
+    if (source.length > richHighlightLimit) {
+      this.plain(source);
+      return;
+    }
     void this.marked(source, generation);
   }
 
@@ -77,6 +93,7 @@ export class EmbedView {
       const blocks = this.host.querySelectorAll<HTMLElement>("pre code");
       if (blocks.length === 0) { this.plain(source); return; }
       blocks.forEach(block => api.highlight.highlightElement(block));
+      finishCacheRestore(__WEB_VERSION__);
     } catch {
       if (generation === this.generation) this.plain(source);
     }
@@ -89,5 +106,6 @@ export class EmbedView {
     code.textContent = source;
     pre.append(code);
     this.host.replaceChildren(pre);
+    finishCacheRestore(__WEB_VERSION__);
   }
 }
