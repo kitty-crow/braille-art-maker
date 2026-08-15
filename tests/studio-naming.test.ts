@@ -4,7 +4,7 @@ import { extname, join, relative } from "node:path";
 
 const root = join(import.meta.dir, "..");
 const textExt = new Set([".ts", ".md", ".html", ".css", ".svg", ".json"]);
-const externalRepoSlug = "braille-art-maker";
+const staleRepoSlug = "braille-art-maker";
 
 const files = async (path: string): Promise<string[]> => {
   const out: string[] = [];
@@ -16,7 +16,7 @@ const files = async (path: string): Promise<string[]> => {
   return out;
 };
 
-test("owned product code and documentation consistently use Studio, not Maker", async () => {
+test("owned product code and documentation consistently use Studio", async () => {
   const paths = [
     ...await files(join(root, "src")),
     ...await files(join(root, "web")),
@@ -27,16 +27,16 @@ test("owned product code and documentation consistently use Studio, not Maker", 
   ];
   const stale: string[] = [];
   for (const path of paths) {
-    const source = (await readFile(path, "utf8")).replaceAll(externalRepoSlug, "external-repo");
-    if (/\bmaker\b/iu.test(source) || source.includes("unicode-art-maker")) stale.push(relative(root, path));
+    const source = await readFile(path, "utf8");
+    if (/\bmaker\b/iu.test(source) || source.includes("unicode-art-maker") || source.includes(staleRepoSlug)) stale.push(relative(root, path));
   }
   expect(stale).toEqual([]);
 });
 
-test("renamed Maker implementation files no longer exist in the owned tree", async () => {
+test("Studio implementation files are canonical in the owned tree", async () => {
   const owned = [...await files(join(root, "src")), ...await files(join(root, "web"))].map(path => relative(root, path));
-  expect(owned).not.toContain("src/web/maker.ts");
-  expect(owned).not.toContain("web/styles/maker.css");
+  expect(owned).not.toContain(["src", "web", "maker.ts"].join("/"));
+  expect(owned).not.toContain(["web", "styles", "maker.css"].join("/"));
   expect(owned).toContain("src/web/studio.ts");
   expect(owned).toContain("web/styles/studio.css");
 });

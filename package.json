@@ -1,12 +1,12 @@
 {
   "name": "@kitty-crow/unicode-art-studio",
-  "version": "0.4.36",
+  "version": "0.4.37",
   "description": "PNG to dense Unicode art for Bun and the browser.",
   "type": "module",
   "license": "MIT",
   "author": "Kitty Crow <kitty@kittycrow.dev> (https://kittycrow.dev)",
-  "repository": "github:kitty-crow/braille-art-maker",
-  "homepage": "https://kitty-crow.github.io/braille-art-maker/",
+  "repository": "github:kitty-crow/unicode-art-studio",
+  "homepage": "https://kitty-crow.github.io/unicode-art-studio/",
   "bin": { "unicode-art": "./dist/cli.js" },
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "scripts": {

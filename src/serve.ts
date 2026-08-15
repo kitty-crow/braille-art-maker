@@ -8,7 +8,7 @@ const server = Bun.serve({
   port,
   async fetch(request: Request) {
     const url = new URL(request.url);
-    const rel = url.pathname.replace(/^\/braille-art-maker\/?/, "/");
+    const rel = url.pathname.replace(/^\/unicode-art-studio\/?/, "/");
     const clean = normalize(rel).replace(/^\.\.(?:\/|\\)/, "");
     const candidate = join(root, clean === "/" ? "index.html" : clean);
     for (const path of [candidate, join(candidate, "index.html")]) {

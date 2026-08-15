@@ -149,12 +149,16 @@ test("Compact exposes Payload as a story as an embed-only checkbox", async () =>
   expect(css).toContain('.embed-story-info');
 });
 
-test("studio packs paste-ready embeds in a dedicated worker with selectable payload representation", async () => {
+test("studio packs paste-ready embeds in a dedicated worker with selectable payload representation and copy feedback", async () => {
   const html = await read("web/index.html");
   const studio = await read("src/web/studio.ts");
+  const view = await read("src/web/embed-view.ts");
+  const css = await read("web/styles/studio.css");
   const webEmbed = await read("src/web/embed.ts");
   const worker = await read("src/web/embed-worker.ts");
-  expect(html).toContain('id="copy-embed"');
+  expect(html).toContain('id="copy-embed" class="button copy-button"');
+  expect(html).toContain('class="copy-button__copy"');
+  expect(html).toContain('class="copy-button__check"');
   expect(html).toContain('id="embed-code" class="embed-code-view"');
   expect(html).toContain('<span>Encoding art…</span>');
   expect(studio).toContain('void embedHtml(next, cfg, "auto", "auto", progress =>');
@@ -162,6 +166,13 @@ test("studio packs paste-ready embeds in a dedicated worker with selectable payl
   expect(studio).toContain('setEmbedProgress(progress.done, progress.total);');
   expect(studio).toContain('embedView.render(value);');
   expect(studio).toContain('navigator.clipboard.writeText(embed)');
+  expect(view).toContain('event.stopImmediatePropagation();');
+  expect(view).toContain('button.dataset.copyState = "success";');
+  expect(view).toContain('label.textContent = "Copied";');
+  expect(view).toContain('await navigator.clipboard.writeText(this.compact);');
+  expect(view).toContain('this.showCopySuccess(button);');
+  expect(css).toContain('&[data-copy-state="success"] .copy-button__copy');
+  expect(css).toContain('&[data-copy-state="success"] .copy-button__check');
   expect(webEmbed).toContain('const workerUrl = new URL("embed-worker.js", import.meta.url);');
   expect(webEmbed).toContain('getWorker().postMessage({ id, art, cfg, theme, surface, story });');
   expect(webEmbed).toContain('getWorker().postMessage({ id, raw, cfg, theme, surface, story }, [raw.buffer as ArrayBuffer]);');
@@ -240,12 +251,13 @@ test("logo and favicon are wired into the Studio site", async () => {
 });
 
 test("project version and package metadata stay in sync", async () => {
-  const pkg = JSON.parse(await read("package.json")) as { version: string; name: string; repository: string };
+  const pkg = JSON.parse(await read("package.json")) as { version: string; name: string; repository: string; homepage: string };
   const ver = JSON.parse(await read("version.json")) as { version: string };
   expect(ver.version).toBe(pkg.version);
-  expect(pkg.version).toBe("0.4.36");
+  expect(pkg.version).toBe("0.4.37");
   expect(pkg.name).toBe("@kitty-crow/unicode-art-studio");
-  expect(pkg.repository).toBe("github:kitty-crow/braille-art-maker");
+  expect(pkg.repository).toBe("github:kitty-crow/unicode-art-studio");
+  expect(pkg.homepage).toBe("https://kitty-crow.github.io/unicode-art-studio/");
 });
 
 test("styles are split by concern and Studio stylesheet is canonical", async () => {
@@ -263,7 +275,8 @@ test("README uses the shared markdown runtime and Ko-fi integration", async () =
   const html = await read("web/readme/index.html");
   expect(config).toContain('files: ["kofi.css"]');
   expect(config).toContain('user: "kittycrow"');
-  expect(config).toContain('repo: "braille-art-maker"');
+  expect(config).toContain('base: "/unicode-art-studio/"');
+  expect(config).toContain('repo: "unicode-art-studio"');
   expect(html).toContain('id="readme-content" class="panel markdown"');
   expect(html).toContain('id="readme-status" class="sr-only"');
 });

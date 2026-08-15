@@ -123,6 +123,7 @@ const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
 export class EmbedView {
   private renderGeneration = 0;
   private staticGeneration = 0;
+  private copyFeedbackTimer = 0;
   private mode: Mode = "compact";
   private compact = "";
   private staticArtifact: StaticArtifact | null = null;
@@ -130,6 +131,7 @@ export class EmbedView {
   private readonly staticTab: HTMLButtonElement;
   private readonly compactOptions: HTMLDivElement;
   private readonly storyInput: HTMLInputElement;
+  private readonly copyButton: HTMLButtonElement | null;
 
   constructor(private readonly host: HTMLElement, private readonly onStoryChange?: (story: boolean) => void) {
     const tabs = document.createElement("div");
@@ -153,24 +155,25 @@ export class EmbedView {
     info.type = "button";
     info.className = "slider-info embed-story-info";
     info.textContent = "?";
-    info.dataset.tip = "Encodes the complete image payload as reversible Japanese prose instead of the smallest Unicode payload. The embed is larger; the story itself is the image data. See README → Compact payload modes.";
-    info.setAttribute("aria-label", "About Payload as a story. Uses reversible Japanese prose for the complete image payload, making the embed larger. See the README section Compact payload modes for details.");
+    info.dataset.tip = "Encodes the complete image payload as reversible light-novel-style Japanese prose instead of the smallest Unicode payload. The embed is larger; the story itself is the image data. See README → Compact payload modes.";
+    info.setAttribute("aria-label", "About Payload as a story. Uses reversible light-novel-style Japanese prose for the complete image payload, making the embed larger. See the README section Compact payload modes for details.");
     this.compactOptions.append(label, info);
     host.before(tabs, this.compactOptions);
 
-    const copy = document.querySelector<HTMLButtonElement>("#copy-embed");
-    copy?.addEventListener("click", event => {
-      if (this.mode !== "static") return;
+    this.copyButton = document.querySelector<HTMLButtonElement>("#copy-embed");
+    this.copyButton?.addEventListener("click", event => {
       event.preventDefault();
       event.stopImmediatePropagation();
-      void this.copyStatic(copy);
+      void this.copyCurrent(this.copyButton as HTMLButtonElement);
     }, { capture: true });
+    this.syncCopyButton();
   }
 
   render(source: string): void {
     this.compact = source;
     this.staticArtifact = null;
     ++this.staticGeneration;
+    this.syncCopyButton();
     if (!source) {
       this.host.replaceChildren();
       return;
@@ -202,12 +205,50 @@ export class EmbedView {
     this.compactTab.setAttribute("aria-selected", String(mode === "compact"));
     this.staticTab.setAttribute("aria-selected", String(mode === "static"));
     this.compactOptions.hidden = mode !== "compact";
+    this.syncCopyButton();
     if (!this.compact) {
       this.host.replaceChildren();
       return;
     }
     if (mode === "compact") this.renderCode(this.compact);
     else void this.showStatic();
+  }
+
+  private copyIdleLabel(): string {
+    return this.mode === "static" ? "Copy HTML" : "Copy embed";
+  }
+
+  private syncCopyButton(): void {
+    const button = this.copyButton;
+    if (!button) return;
+    window.clearTimeout(this.copyFeedbackTimer);
+    delete button.dataset.copyState;
+    const label = button.querySelector<HTMLElement>(".copy-button__label");
+    if (label) label.textContent = this.copyIdleLabel();
+    button.setAttribute("aria-label", this.copyIdleLabel());
+  }
+
+  private showCopySuccess(button: HTMLButtonElement): void {
+    window.clearTimeout(this.copyFeedbackTimer);
+    button.dataset.copyState = "success";
+    const label = button.querySelector<HTMLElement>(".copy-button__label");
+    if (label) label.textContent = "Copied";
+    button.setAttribute("aria-label", "Copied to clipboard");
+    this.copyFeedbackTimer = window.setTimeout(() => this.syncCopyButton(), 1200);
+  }
+
+  private async copyCurrent(button: HTMLButtonElement): Promise<void> {
+    if (this.mode === "static") {
+      await this.copyStatic(button);
+      return;
+    }
+    if (!this.compact) return;
+    try {
+      await navigator.clipboard.writeText(this.compact);
+      this.showCopySuccess(button);
+    } catch (error) {
+      console.warn(error instanceof Error ? error.message : "Clipboard access was blocked.");
+    }
   }
 
   private staticPreview(artifact: StaticArtifact): string {
@@ -256,12 +297,9 @@ export class EmbedView {
         if (artifact.blob.size > safeTextFallbackBytes) throw new Error("This browser cannot copy such a large static embed without materialising it in memory. Use a browser with ClipboardItem support.");
         await navigator.clipboard.writeText(await artifact.blob.text());
       }
-      const old = button.textContent;
-      button.textContent = "Copied static HTML";
-      setTimeout(() => { button.textContent = old; }, 1100);
+      this.showCopySuccess(button);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Clipboard access was blocked.";
-      this.message(message);
+      console.warn(error instanceof Error ? error.message : "Clipboard access was blocked.");
     }
   }
 
