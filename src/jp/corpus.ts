@@ -46,3 +46,18 @@ export const parseCorpusXml = (source: string): CorpusPack => {
   if (entries.length === 0) throw new Error("Japanese corpus contains no entries.");
   return { id: rootAttrs.id, version: 1, entries };
 };
+
+export const mergeCorpusPacks = (id: string, packs: readonly CorpusPack[]): CorpusPack => {
+  if (!id) throw new Error("Merged Japanese corpus id is missing.");
+  if (packs.length === 0) throw new Error("No Japanese corpus packs were supplied.");
+  const seen = new Set<string>();
+  const entries: CorpusEntry[] = [];
+  for (const pack of packs) {
+    for (const entry of pack.entries) {
+      if (seen.has(entry.id)) throw new Error(`Duplicate Japanese corpus entry id: ${entry.id}`);
+      seen.add(entry.id);
+      entries.push(entry);
+    }
+  }
+  return { id, version: 1, entries };
+};
