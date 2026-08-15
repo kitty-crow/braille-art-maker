@@ -28,6 +28,6 @@
   <entry id="tpl-026" kind="template">{connector}、{person}は{object}を{transitiveDict}ことにした。</entry>
   <entry id="tpl-027" kind="template">{person}は{object}を{transitiveDict}つもりだったが、{place}で{intransitive}。</entry>
   <entry id="tpl-028" kind="template">{object}を{transitiveDict}前に、{person}は{place}で{object2}を見つけた。</entry>
-  <entry id="tpl-029" kind="template">{person}が{place}へ{motion}と、{object}はもうそこになかった。</entry>
-  <entry id="tpl-030" kind="template">{dialogue}と聞いて、{person}は{object}を{transitiveDict}のをやめた。</entry>
+  <entry id="tpl-029" kind="template">{person}が{place}へ{motionDict}と、{object}はもうそこになかった。</entry>
+  <entry id="tpl-030" kind="template">「{dialogue}」と聞いて、{person}は{object}を{transitiveDict}のをやめた。</entry>
 </corpus>
