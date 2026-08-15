@@ -1,6 +1,6 @@
 import type { EmbedCodec } from "../embed/codec.ts";
-import { staticPackedHtml } from "../embed/static-html.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
+import { makeStaticArtifact, type StaticArtifact } from "./static-artifact.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
@@ -17,6 +17,7 @@ const src = {
 const loads = new Map<string, Promise<void>>();
 const richHighlightLimit = 96_000;
 const payloadToken = "__UNICODE_ART_PACKED_PAYLOAD__";
+const safeTextFallbackBytes = 4 * 1024 * 1024;
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -117,7 +118,7 @@ export class EmbedView {
   private staticGeneration = 0;
   private mode: Mode = "compact";
   private compact = "";
-  private staticHtml = "";
+  private staticArtifact: StaticArtifact | null = null;
   private readonly compactTab: HTMLButtonElement;
   private readonly staticTab: HTMLButtonElement;
 
@@ -142,7 +143,7 @@ export class EmbedView {
 
   render(source: string): void {
     this.compact = source;
-    this.staticHtml = "";
+    this.staticArtifact = null;
     ++this.staticGeneration;
     if (!source) {
       this.host.replaceChildren();
@@ -178,10 +179,15 @@ export class EmbedView {
     else void this.showStatic();
   }
 
-  private async showStatic(): Promise<string> {
-    if (this.staticHtml) {
-      this.renderCode(this.staticHtml);
-      return this.staticHtml;
+  private staticPreview(artifact: StaticArtifact): string {
+    if (!artifact.truncated) return artifact.preview;
+    return `${artifact.preview}\n<!-- Preview truncated in the maker. Copy embed copies the complete self-contained HTML. -->`;
+  }
+
+  private async showStatic(): Promise<StaticArtifact | null> {
+    if (this.staticArtifact) {
+      this.renderCode(this.staticPreview(this.staticArtifact));
+      return this.staticArtifact;
     }
     const compact = this.compact;
     const generation = ++this.staticGeneration;
@@ -189,30 +195,36 @@ export class EmbedView {
     try {
       const packed = packedSource(compact);
       const decoded = await unpackEmbedSmall(packed.data, packed.codec);
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      const html = staticPackedHtml(decoded);
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      this.staticHtml = html;
-      if (this.mode === "static") this.renderCode(html);
-      return html;
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
+      const artifact = await makeStaticArtifact(decoded);
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
+      this.staticArtifact = artifact;
+      if (this.mode === "static") this.renderCode(this.staticPreview(artifact));
+      return artifact;
     } catch (error) {
-      if (generation !== this.staticGeneration || compact !== this.compact) return "";
+      if (generation !== this.staticGeneration || compact !== this.compact) return null;
       const message = error instanceof Error ? error.message : "Static HTML generation failed.";
       this.message(`No-JavaScript HTML unavailable: ${message}`);
-      return "";
+      return null;
     }
   }
 
   private async copyStatic(button: HTMLButtonElement): Promise<void> {
-    const html = this.staticHtml || await this.showStatic();
-    if (!html) return;
+    const artifact = this.staticArtifact ?? await this.showStatic();
+    if (!artifact) return;
     try {
-      await navigator.clipboard.writeText(html);
+      if (navigator.clipboard.write && typeof ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": artifact.blob })]);
+      } else {
+        if (artifact.blob.size > safeTextFallbackBytes) throw new Error("This browser cannot copy such a large static embed without materialising it in memory. Use a browser with ClipboardItem support.");
+        await navigator.clipboard.writeText(await artifact.blob.text());
+      }
       const old = button.textContent;
       button.textContent = "Copied static HTML";
       setTimeout(() => { button.textContent = old; }, 1100);
-    } catch {
-      this.message("Clipboard access was blocked. Select the displayed static HTML and copy it manually.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Clipboard access was blocked.";
+      this.message(message);
     }
   }
 
