@@ -1,4 +1,5 @@
-import { originalLnCorpus, originalLnCorpusV1 } from "../jp/default.ts";
+import { authenticJapaneseSentences } from "../jp/authentic.ts";
+import { originalLnCorpusV1, originalLnCorpusV2 } from "../jp/default.ts";
 import type { CorpusEntry, CorpusPack } from "../jp/corpus.ts";
 
 export type JapaneseCompactMode = "r" | "d" | "b";
@@ -7,7 +8,9 @@ export interface JapaneseCompactPayload { readonly mode: JapaneseCompactMode; re
 export const japaneseCompactPrefix = "物語は、ここから始まる。";
 const legacyChunkedPrefix = `${japaneseCompactPrefix}いくつもの章を重ねながら、物語は続いていく。`;
 const corpusV2Marker = "静かな魔法の気配が、物語の奥で揺れている。";
-const chunkedPrefix = `${legacyChunkedPrefix}${corpusV2Marker}`;
+const corpusV2Prefix = `${legacyChunkedPrefix}${corpusV2Marker}`;
+const corpusV3Marker = "【青空文庫コーパス第三版】";
+const chunkedPrefix = `${legacyChunkedPrefix}${corpusV3Marker}`;
 const chapterSeparator = "――そして、物語は次の章へ。";
 const chapterBytes = 256;
 
@@ -26,7 +29,14 @@ interface JapaneseGrammar {
   readonly decodeState: (source: string, start: number, end: number) => bigint;
 }
 
-const makeGrammar = (corpus: CorpusPack): JapaneseGrammar => {
+const bytesToState = (bytes: Uint8Array): bigint => {
+  let state = 1n;
+  for (const byte of bytes) state = (state << 8n) | BigInt(byte);
+  return state;
+};
+
+/* Legacy synthetic grammar. Kept strictly for v1/v2 decoder compatibility. */
+const makeLegacyGrammar = (corpus: CorpusPack): JapaneseGrammar => {
   const byKind = (kind: CorpusEntry["kind"]): readonly CorpusEntry[] => corpus.entries.filter(entry => entry.kind === kind);
   const unique = (values: readonly string[], label: string): readonly string[] => {
     const out = [...new Set(values)];
@@ -132,12 +142,6 @@ const makeGrammar = (corpus: CorpusPack): JapaneseGrammar => {
     return { text: out, state };
   };
 
-  const bytesToState = (bytes: Uint8Array): bigint => {
-    let state = 1n;
-    for (const byte of bytes) state = (state << 8n) | BigInt(byte);
-    return state;
-  };
-
   const encodeChapter = (bytes: Uint8Array): string => {
     let state = bytesToState(bytes);
     let out = "";
@@ -195,8 +199,59 @@ const makeGrammar = (corpus: CorpusPack): JapaneseGrammar => {
   return { encodeChapter, decodeState };
 };
 
-const legacyGrammar = makeGrammar(originalLnCorpusV1);
-const currentGrammar = makeGrammar(originalLnCorpus);
+/*
+ * Active v3 grammar. Each radix-64 digit is represented by one complete,
+ * authentic, provenance-tracked sentence. No generated fragments or template
+ * recombination are involved in new encodes.
+ */
+const makeAuthenticGrammar = (sentences: readonly string[]): JapaneseGrammar => {
+  const radix = 64;
+  if (sentences.length !== radix) throw new Error(`Japanese authentic corpus needs exactly ${radix} sentences.`);
+  if (new Set(sentences).size !== sentences.length) throw new Error("Japanese authentic corpus sentences must be unique.");
+  for (let i = 0; i < sentences.length; i += 1) {
+    const sentence = sentences[i]!;
+    if (!sentence) throw new Error("Japanese authentic corpus contains an empty sentence.");
+    if (sentence.includes(chapterSeparator)) throw new Error("Japanese authentic corpus contains the chapter separator.");
+    for (let j = 0; j < sentences.length; j += 1) {
+      if (i !== j && sentences[j]!.startsWith(sentence)) {
+        throw new Error("Japanese authentic corpus must be prefix-free.");
+      }
+    }
+  }
+
+  const entries = sentences.map((text, index) => ({ text, index }));
+  const encodeChapter = (bytes: Uint8Array): string => {
+    let state = bytesToState(bytes);
+    let out = "";
+    while (state > 0n) {
+      const digit = Number(state & 63n);
+      state >>= 6n;
+      out += sentences[digit]!;
+    }
+    return out;
+  };
+
+  const decodeState = (source: string, start: number, end: number): bigint => {
+    let at = start;
+    let state = 0n;
+    let factor = 1n;
+    while (at < end) {
+      const found = entries.find(entry => source.startsWith(entry.text, at) && at + entry.text.length <= end);
+      if (!found) throw new Error("Japanese compact payload contains a sentence outside the authentic corpus.");
+      state += BigInt(found.index) * factor;
+      factor <<= 6n;
+      at += found.text.length;
+    }
+    if (at !== end) throw new Error("Japanese compact payload has invalid chapter framing.");
+    return state;
+  };
+
+  return { encodeChapter, decodeState };
+};
+
+const legacyGrammar = makeLegacyGrammar(originalLnCorpusV1);
+const v2Grammar = makeLegacyGrammar(originalLnCorpusV2);
+const currentGrammar = makeAuthenticGrammar(authenticJapaneseSentences.map(entry => entry.text));
 
 const modeByte = (mode: JapaneseCompactMode): number => mode === "r" ? 0 : mode === "d" ? 1 : 2;
 const modeFromByte = (value: number): JapaneseCompactMode => {
@@ -292,6 +347,7 @@ export const decodeJapaneseCompact = (source: string): JapaneseCompactPayload =>
   if (!isJapaneseCompactPayload(source)) throw new Error("Japanese compact payload header is missing.");
   if (/[\r\n]/u.test(source)) throw new Error("Japanese compact payload must be a single line.");
   if (source.startsWith(chunkedPrefix)) return decodeChunked(source, chunkedPrefix, currentGrammar);
+  if (source.startsWith(corpusV2Prefix)) return decodeChunked(source, corpusV2Prefix, v2Grammar);
   if (source.startsWith(legacyChunkedPrefix)) return decodeChunked(source, legacyChunkedPrefix, legacyGrammar);
   return decodeLegacy(source);
 };
