@@ -1,18 +1,27 @@
 import brotliPromise from "brotli-wasm";
 import { deflateSync, inflateSync } from "fflate";
 import type { Art, ArtCfg } from "../types.ts";
-import { decodeU3, decodeU4, encodeU4Japanese, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
+import { decodeU3, decodeU4, encodeU4, encodeU4J, encodeU4Japanese, unpackEmbed, unpackRaw, type EmbedCodec, type PackedEmbed, type U4Mode } from "./codec.ts";
 import { isUltraRaw, unpackUltra } from "./ultra-raw.ts";
 import { packU4, type PackProgressFn } from "./ultra-search.ts";
 
 const unpackBytes = (bytes: Uint8Array): PackedEmbed => isUltraRaw(bytes) ? unpackUltra(bytes) : unpackRaw(bytes);
 
-export const packEmbedSmall = async (art: Art, cfg: ArtCfg, progress?: PackProgressFn): Promise<string> => {
+export const packEmbedSmall = async (
+  art: Art,
+  cfg: ArtCfg,
+  progress?: PackProgressFn,
+  story = false,
+): Promise<string> => {
   const brotli = await brotliPromise;
-  return packU4(art, cfg, bytes => brotli.compress(bytes, { quality: 11 }), progress);
+  return packU4(art, cfg, bytes => brotli.compress(bytes, { quality: 11 }), progress, story);
 };
 
-export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgressFn): Promise<string> => {
+export const packRawEmbedSmall = async (
+  raw: Uint8Array,
+  progress?: PackProgressFn,
+  story = false,
+): Promise<string> => {
   const brotli = await brotliPromise;
   const total = 3;
   let done = 0;
@@ -26,9 +35,21 @@ export const packRawEmbedSmall = async (raw: Uint8Array, progress?: PackProgress
   step();
   candidates.push({ mode: "b", bytes: brotli.compress(raw, { quality: 11 }) });
   step();
-  candidates.sort((a, b) => a.bytes.length - b.bytes.length);
-  const best = candidates[0]!;
-  return encodeU4Japanese(best.mode, best.bytes);
+
+  if (story) {
+    candidates.sort((a, b) => a.bytes.length - b.bytes.length);
+    const best = candidates[0]!;
+    return encodeU4Japanese(best.mode, best.bytes);
+  }
+
+  let best = "";
+  for (const candidate of candidates) {
+    for (const value of [encodeU4(candidate.mode, candidate.bytes), encodeU4J(candidate.mode, candidate.bytes)]) {
+      if (!best || value.length < best.length) best = value;
+    }
+  }
+  if (!best) throw new Error("No Unicode packing candidate was generated.");
+  return best;
 };
 
 export const unpackEmbedSmall = async (source: string, codec: EmbedCodec): Promise<PackedEmbed> => {

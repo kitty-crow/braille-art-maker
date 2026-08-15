@@ -71,8 +71,9 @@ export const embedHtml = (
   surface: EmbedSurface = "auto",
   progress?: (value: PackProgress) => void,
   preparedRaw?: Uint8Array,
+  story = false,
 ): Promise<string> => new Promise((resolve, reject) => {
-  // Only the newest generated art matters in the maker. Killing stale work also releases
+  // Only the newest generated art matters in the studio. Killing stale work also releases
   // any large Brotli/WASM allocation before a new high-resolution encode begins.
   cancelEmbedHtml();
 
@@ -85,9 +86,9 @@ export const embedHtml = (
     // cache-prepared exact raw payload when available, otherwise build it once here, then
     // transfer ownership of the ArrayBuffer to the one-shot Worker.
     const raw = preparedRaw ?? packBoundedRaw(art, cfg);
-    getWorker().postMessage({ id, raw, cfg, theme, surface }, [raw.buffer as ArrayBuffer]);
+    getWorker().postMessage({ id, raw, cfg, theme, surface, story }, [raw.buffer as ArrayBuffer]);
     return;
   }
 
-  getWorker().postMessage({ id, art, cfg, theme, surface });
+  getWorker().postMessage({ id, art, cfg, theme, surface, story });
 });

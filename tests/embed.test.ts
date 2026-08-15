@@ -122,7 +122,7 @@ test("u1 embeds remain decodable", () => {
   expect(unpackEmbed(legacy).cellColours).toEqual(colours);
 });
 
-test("u4 searches exact representations and remains lossless", async () => {
+test("default u4 searches super compact representations and remains lossless", async () => {
   const packed = await packEmbedSmall(art, cfg);
   const decoded = await unpackEmbedSmall(packed, "u4");
   expect(embedCodec).toBe("u4");
@@ -130,22 +130,35 @@ test("u4 searches exact representations and remains lossless", async () => {
   expect(decoded.rows).toBe(art.rows);
   expect([...decoded.masks]).toEqual([255, 255, 63, 63, 255, 255, 0, 0]);
   expect(decoded.cellColours).toEqual(colours);
-  expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
-  expect(packed).not.toMatch(/[\r\n]/u);
+  expect(packed.startsWith(japaneseCompactPrefix)).toBe(false);
   expect(packed).not.toContain("⣿");
   expect(packed).not.toContain("<#");
-  expect(packed).not.toContain("<");
-  expect(packed).not.toContain(">");
 });
 
-test("current Compact Japanese transport remains lossless across representative art", async () => {
+test("super compact u4 beats or matches u3 on representative art", async () => {
   const cases: readonly [Art, ArtCfg][] = [
     [repeatedArt(), {}],
     [gradientArt(), { colour: true }],
     [fullColourArt(), { colour: true, colourBackground: true, fullColour: true }],
   ];
   for (const [source, config] of cases) {
-    const packed = await packEmbedSmall(source, config);
+    const u3 = packU3(source, config);
+    const u4 = await packEmbedSmall(source, config);
+    expect(u4.length).toBeLessThanOrEqual(u3.length);
+    const decoded = await unpackEmbedSmall(u4, "u4");
+    expect(decoded.masks).toEqual((await unpackEmbedSmall(u3, "u3")).masks);
+    expect(decoded.cellColours).toEqual(source.cellColours);
+  }
+});
+
+test("Payload as a story remains lossless across representative art", async () => {
+  const cases: readonly [Art, ArtCfg][] = [
+    [repeatedArt(), {}],
+    [gradientArt(), { colour: true }],
+    [fullColourArt(), { colour: true, colourBackground: true, fullColour: true }],
+  ];
+  for (const [source, config] of cases) {
+    const packed = await packEmbedSmall(source, config, true);
     expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
     expect(packed).not.toMatch(/[\r\n]/u);
     const decoded = await unpackEmbedSmall(packed, "u4");
@@ -172,8 +185,8 @@ test("u2 deflates the packed binary before base64url encoding", () => {
   expect(unpackEmbed(u2, "u2").masks).toEqual(unpackEmbed(u1, "u1").masks);
 });
 
-test("Compact payload is safe single-line Japanese and lossless", async () => {
-  const packed = await packEmbedSmall(art, cfg);
+test("story payload is safe single-line Japanese and lossless", async () => {
+  const packed = await packEmbedSmall(art, cfg, true);
   expect(packed.startsWith(japaneseCompactPrefix)).toBe(true);
   expect(packed).not.toMatch(/[\r\n<>&]/u);
   const decoded = await unpackEmbedSmall(packed, "u4");
@@ -181,8 +194,8 @@ test("Compact payload is safe single-line Japanese and lossless", async () => {
   expect(decoded.cellColours).toEqual(colours);
 });
 
-test("new embed shell keeps host, pure Japanese payload, codec metadata and loader", async () => {
-  const packed = await packEmbedSmall(art, cfg);
+test("embed shell carries explicit codec metadata for story payloads", async () => {
+  const packed = await packEmbedSmall(art, cfg, true);
   const html = new Tpl().make({
     data: packed,
     codec: embedCodec,

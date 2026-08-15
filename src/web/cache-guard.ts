@@ -1,4 +1,4 @@
-const key = "unicode-art-maker:cache-restore-pending";
+const key = "unicode-art-studio:cache-restore-pending";
 
 const storage = (): Storage | null => {
   try { return window.localStorage; } catch { return null; }

@@ -5,6 +5,9 @@ export type JapaneseCompactMode = "r" | "d" | "b";
 export interface JapaneseCompactPayload { readonly mode: JapaneseCompactMode; readonly bytes: Uint8Array; }
 
 export const japaneseCompactPrefix = "物語は、ここから始まる。";
+const chunkedPrefix = `${japaneseCompactPrefix}いくつもの章を重ねながら、物語は続いていく。`;
+const chapterSeparator = "――そして、物語は次の章へ。";
+const chapterBytes = 256;
 
 const tokenRx = /\{([A-Za-z][A-Za-z0-9]*)\}/gu;
 const escapeRx = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -66,7 +69,7 @@ interface TemplateSpec {
 
 const compileTemplate = (entry: CorpusEntry): TemplateSpec => {
   const tokens: string[] = [];
-  let pattern = "^";
+  let pattern = "";
   let at = 0;
   for (const match of entry.text.matchAll(tokenRx)) {
     const index = match.index ?? 0;
@@ -79,7 +82,8 @@ const compileTemplate = (entry: CorpusEntry): TemplateSpec => {
   }
   pattern += escapeRx(entry.text.slice(at));
   if (tokens.length === 0) throw new Error(`Japanese compact template ${entry.id} has no data slots.`);
-  return { id: entry.id, text: entry.text, tokens, regex: new RegExp(pattern, "u") };
+  if (entry.text.includes(chapterSeparator)) throw new Error(`Japanese compact template ${entry.id} contains the chapter separator.`);
+  return { id: entry.id, text: entry.text, tokens, regex: new RegExp(pattern, "uy") };
 };
 
 const templates = byKind("template").map(compileTemplate);
@@ -105,14 +109,7 @@ const modeFromByte = (value: number): JapaneseCompactMode => {
   throw new Error("Japanese compact payload has an invalid compression mode.");
 };
 
-const stateFrom = (mode: JapaneseCompactMode, bytes: Uint8Array): bigint => {
-  let value = BigInt(modeByte(mode));
-  for (const byte of bytes) value = (value << 8n) | BigInt(byte);
-  const length = bytes.length + 1;
-  return (1n << BigInt(length * 8)) | value;
-};
-
-const stateTo = (state: bigint): JapaneseCompactPayload => {
+const legacyStateTo = (state: bigint): JapaneseCompactPayload => {
   if (state <= 0n) throw new Error("Japanese compact payload has no encoded state.");
   const bitLength = state.toString(2).length;
   if ((bitLength - 1) % 8 !== 0) throw new Error("Japanese compact payload has invalid byte framing.");
@@ -125,6 +122,26 @@ const stateTo = (state: bigint): JapaneseCompactPayload => {
     value >>= 8n;
   }
   return { mode: modeFromByte(framed[0]!), bytes: framed.slice(1) };
+};
+
+const bytesToState = (bytes: Uint8Array): bigint => {
+  let state = 1n;
+  for (const byte of bytes) state = (state << 8n) | BigInt(byte);
+  return state;
+};
+
+const stateToBytes = (state: bigint): Uint8Array => {
+  if (state <= 0n) throw new Error("Japanese compact chapter has no encoded state.");
+  const bitLength = state.toString(2).length;
+  if ((bitLength - 1) % 8 !== 0) throw new Error("Japanese compact chapter has invalid byte framing.");
+  const length = (bitLength - 1) / 8;
+  let value = state - (1n << BigInt(length * 8));
+  const bytes = new Uint8Array(length);
+  for (let i = length - 1; i >= 0; i -= 1) {
+    bytes[i] = Number(value & 0xffn);
+    value >>= 8n;
+  }
+  return bytes;
 };
 
 const takeDigit = (state: bigint, radix: number): { readonly digit: number; readonly state: bigint } => ({
@@ -150,9 +167,9 @@ const renderTemplate = (spec: TemplateSpec, start: bigint): { readonly text: str
   return { text: out, state };
 };
 
-export const encodeJapaneseCompact = (mode: JapaneseCompactMode, bytes: Uint8Array): string => {
-  let state = stateFrom(mode, bytes);
-  let out = japaneseCompactPrefix;
+const encodeChapter = (bytes: Uint8Array): string => {
+  let state = bytesToState(bytes);
+  let out = "";
   while (state > 0n) {
     const chosen = takeDigit(state, templates.length);
     state = chosen.state;
@@ -163,13 +180,27 @@ export const encodeJapaneseCompact = (mode: JapaneseCompactMode, bytes: Uint8Arr
   return out;
 };
 
+export const encodeJapaneseCompact = (mode: JapaneseCompactMode, bytes: Uint8Array): string => {
+  const chapters: string[] = [];
+  const firstPayload = Math.min(bytes.length, chapterBytes - 1);
+  const first = new Uint8Array(firstPayload + 1);
+  first[0] = modeByte(mode);
+  first.set(bytes.subarray(0, firstPayload), 1);
+  chapters.push(encodeChapter(first));
+  for (let at = firstPayload; at < bytes.length; at += chapterBytes) {
+    chapters.push(encodeChapter(bytes.subarray(at, Math.min(bytes.length, at + chapterBytes))));
+  }
+  return `${chunkedPrefix}${chapters.join(chapterSeparator)}`;
+};
+
 interface MatchedTemplate { readonly index: number; readonly spec: TemplateSpec; readonly match: RegExpExecArray; }
-const matchTemplate = (source: string): MatchedTemplate => {
+const matchTemplate = (source: string, at: number, end: number): MatchedTemplate => {
   const found: MatchedTemplate[] = [];
   for (let index = 0; index < templates.length; index += 1) {
     const spec = templates[index]!;
+    spec.regex.lastIndex = at;
     const match = spec.regex.exec(source);
-    if (match) found.push({ index, spec, match });
+    if (match && spec.regex.lastIndex <= end) found.push({ index, spec, match });
   }
   if (found.length === 0) throw new Error("Japanese compact payload contains an unrecognised sentence.");
   found.sort((a, b) => b.match[0].length - a.match[0].length);
@@ -179,12 +210,8 @@ const matchTemplate = (source: string): MatchedTemplate => {
   return found[0]!;
 };
 
-export const isJapaneseCompactPayload = (source: string): boolean => source.startsWith(japaneseCompactPrefix);
-
-export const decodeJapaneseCompact = (source: string): JapaneseCompactPayload => {
-  if (!isJapaneseCompactPayload(source)) throw new Error("Japanese compact payload header is missing.");
-  if (/[\r\n]/u.test(source)) throw new Error("Japanese compact payload must be a single line.");
-  let at = japaneseCompactPrefix.length;
+const decodeState = (source: string, start: number, end: number): bigint => {
+  let at = start;
   let state = 0n;
   let factor = 1n;
   const addDigit = (digit: number, radix: number): void => {
@@ -192,8 +219,8 @@ export const decodeJapaneseCompact = (source: string): JapaneseCompactPayload =>
     factor *= BigInt(radix);
   };
 
-  while (at < source.length) {
-    const found = matchTemplate(source.slice(at));
+  while (at < end) {
+    const found = matchTemplate(source, at, end);
     addDigit(found.index, templates.length);
     for (let i = 0; i < found.spec.tokens.length; i += 1) {
       const token = found.spec.tokens[i]!;
@@ -203,5 +230,46 @@ export const decodeJapaneseCompact = (source: string): JapaneseCompactPayload =>
     }
     at += found.match[0].length;
   }
-  return stateTo(state);
+  if (at !== end) throw new Error("Japanese compact payload has invalid chapter framing.");
+  return state;
+};
+
+const decodeChunked = (source: string): JapaneseCompactPayload => {
+  let at = chunkedPrefix.length;
+  let mode: JapaneseCompactMode | null = null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (at < source.length) {
+    const separator = source.indexOf(chapterSeparator, at);
+    const end = separator < 0 ? source.length : separator;
+    const framed = stateToBytes(decodeState(source, at, end));
+    if (mode === null) {
+      if (framed.length < 1) throw new Error("Japanese compact payload is missing its compression mode.");
+      mode = modeFromByte(framed[0]!);
+      const first = framed.subarray(1);
+      if (first.length) { chunks.push(first); total += first.length; }
+    } else {
+      if (framed.length === 0 || framed.length > chapterBytes) throw new Error("Japanese compact payload has invalid chapter size.");
+      chunks.push(framed);
+      total += framed.length;
+    }
+    if (separator < 0) break;
+    at = separator + chapterSeparator.length;
+    if (at >= source.length) throw new Error("Japanese compact payload ends with an empty chapter.");
+  }
+  if (mode === null) throw new Error("Japanese compact payload has no chapters.");
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return { mode, bytes };
+};
+
+const decodeLegacy = (source: string): JapaneseCompactPayload => legacyStateTo(decodeState(source, japaneseCompactPrefix.length, source.length));
+
+export const isJapaneseCompactPayload = (source: string): boolean => source.startsWith(japaneseCompactPrefix);
+
+export const decodeJapaneseCompact = (source: string): JapaneseCompactPayload => {
+  if (!isJapaneseCompactPayload(source)) throw new Error("Japanese compact payload header is missing.");
+  if (/[\r\n]/u.test(source)) throw new Error("Japanese compact payload must be a single line.");
+  return source.startsWith(chunkedPrefix) ? decodeChunked(source) : decodeLegacy(source);
 };

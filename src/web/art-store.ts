@@ -2,7 +2,7 @@ import { unpackBoundedRaw } from "../embed/bounded-raw.ts";
 import type { Art, ArtCfg } from "../types.ts";
 import { beginCacheRestore, finishCacheRestore } from "./cache-guard.ts";
 
-const dbName = "unicode-art-maker-cache";
+const dbName = "unicode-art-studio-cache";
 const dbVersion = 2;
 const legacyStore = "art";
 const sessionStore = "session-v2";

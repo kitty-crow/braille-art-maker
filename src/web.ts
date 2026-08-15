@@ -1,3 +1,3 @@
-import { startMaker } from "./web/maker.ts";
+import { startStudio } from "./web/studio.ts";
 
-startMaker();
+startStudio();

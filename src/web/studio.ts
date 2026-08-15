@@ -1,6 +1,7 @@
 import { taggedText } from "../colour/tagged.ts";
 import { makeArt } from "../core/art.ts";
 import { packBoundedRaw } from "../embed/bounded-raw.ts";
+import { isJapaneseCompactPayload } from "../embed/japanese.ts";
 import { denseHtml } from "../html/dense.ts";
 import type { Art, ArtCfg, Dither, Pixels, VecStage } from "../types.ts";
 import { vectorStage } from "../vector/stage.ts";
@@ -26,8 +27,13 @@ const activeTheme = (): Theme => {
 };
 
 const cacheId = (): string => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const storyEmbed = (html: string): boolean => {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const script = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]');
+  return script?.dataset.codec === "u4" && isJapaneseCompactPayload(script.textContent?.trim() ?? "");
+};
 
-export const startMaker = (): void => {
+export const startStudio = (): void => {
   const heroImg = qs<HTMLImageElement>("#hero-source"), heroUnicode = qs<HTMLElement>("#hero-unicode"), compare = qs<HTMLElement>("#compare"), divider = qs<HTMLElement>("#compare-divider");
   const heroColour = qs<HTMLInputElement>("#hero-colour"), heroFull = qs<HTMLInputElement>("#hero-full-colour");
   const upload = qs<HTMLInputElement>("#upload"), drop = qs<HTMLElement>("#drop"), output = qs<HTMLElement>("#output"), status = qs<HTMLElement>("#status"), previewScroll = qs<HTMLElement>(".preview-scroll"), previewInfo = qs<HTMLButtonElement>("#preview-contrast-info");
@@ -36,7 +42,6 @@ export const startMaker = (): void => {
   const colour = qs<HTMLInputElement>("#colour"), fullColour = qs<HTMLInputElement>("#full-colour");
   const copy = qs<HTMLButtonElement>("#copy"), copyEmbed = qs<HTMLButtonElement>("#copy-embed"), txt = qs<HTMLButtonElement>("#download-txt"), html = qs<HTMLButtonElement>("#download-html"), svg = qs<HTMLButtonElement>("#download-svg"), metrics = qs<HTMLElement>("#metrics"), embedCode = qs<HTMLElement>("#embed-code");
   const embedProgress = qs<HTMLElement>("#embed-progress"), embedProgressBar = qs<HTMLProgressElement>("#embed-progress-bar"), embedProgressText = qs<HTMLOutputElement>("#embed-progress-text");
-  const embedView = new EmbedView(embedCode);
 
   const resolutionMax = 2048;
   const resolutionMin = Number(columns.min);
@@ -59,15 +64,17 @@ export const startMaker = (): void => {
   let vector: VecStage | null = null, name = "hero", art: Art | null = null, embed = "", loadGeneration = 0;
   let currentSource: Blob | string = "assets/hero.png";
   let heroPixels: Pixels | null = null, heroObjectUrl: string | null = null;
-  let makerGeneration = 0, embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
+  let studioGeneration = 0, embedGeneration = 0, embedTimer = 0, manualCanvasDark: boolean | null = null;
+  let currentCacheId = "", currentPaths = 0, currentRectangles = 0, storyPayload = false;
   let cacheTail: Promise<void> = Promise.resolve();
+  let embedView!: EmbedView;
 
   const queueCache = (write: () => Promise<void>): void => {
     cacheTail = cacheTail.catch(() => {}).then(write).catch(() => {});
   };
 
   const setStatus = (text: string, busy = false): void => { status.textContent = text; status.toggleAttribute("data-busy", busy); };
-  const makerCfg = (): ArtCfg => {
+  const studioCfg = (): ArtCfg => {
     const full = colour.checked && fullColour.checked;
     return {
       columns: Number(columnsValue.value), contrast: Number(contrast.value), detail: Number(detail.value), bias: Number(bias.value), dither: dither.value as Dither, invert: invert.checked,
@@ -108,12 +115,12 @@ export const startMaker = (): void => {
     setCanvasControl(manualCanvasDark ?? automaticDarkCanvas(theme), theme);
     syncCanvas(theme);
   };
-  const syncMakerPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };
+  const syncStudioPolarity = (theme: Theme = activeTheme()): void => { invert.checked = canvasDark(theme); };
   const syncColour = (polarity = false, theme: Theme = activeTheme()): void => {
     fullColour.disabled = !colour.checked;
     if (!colour.checked) fullColour.checked = false;
     applyAutomaticCanvas(theme);
-    if (polarity) syncMakerPolarity(theme);
+    if (polarity) syncStudioPolarity(theme);
   };
   const syncHeroColour = (): void => {
     heroFull.disabled = !heroColour.checked;
@@ -148,20 +155,24 @@ export const startMaker = (): void => {
     sourceName: string,
     paths: number,
     rectangles: number,
+    cacheArt = true,
   ): void => {
     if (generation !== embedGeneration || art !== next) return;
+    const story = storyPayload;
     setEmbedProgress(0, 1);
     embedTimer = window.setTimeout(() => {
-      if (generation !== embedGeneration || art !== next) return;
+      if (generation !== embedGeneration || art !== next || story !== storyPayload) return;
       const raw = packBoundedRaw(next, cfg);
-      // Snapshot before the high-resolution Worker takes ownership of raw.buffer.
-      const cachedRaw = new Blob([raw.buffer as ArrayBuffer], { type: "application/x-unicode-art" });
-      queueCache(() => storeCachedArt(__WEB_VERSION__, id, source, sourceName, cfg, paths, rectangles, next, cachedRaw));
+      if (cacheArt) {
+        // Snapshot before the high-resolution Worker takes ownership of raw.buffer.
+        const cachedRaw = new Blob([raw.buffer as ArrayBuffer], { type: "application/x-unicode-art" });
+        queueCache(() => storeCachedArt(__WEB_VERSION__, id, source, sourceName, cfg, paths, rectangles, next, cachedRaw));
+      }
       void embedHtml(next, cfg, "auto", "auto", progress => {
-        if (generation !== embedGeneration || art !== next) return;
+        if (generation !== embedGeneration || art !== next || story !== storyPayload) return;
         setEmbedProgress(progress.done, progress.total);
-      }, raw).then(value => {
-        if (generation !== embedGeneration || art !== next) return;
+      }, raw, story).then(value => {
+        if (generation !== embedGeneration || art !== next || story !== storyPayload) return;
         embed = value;
         setEmbedProgress(1, 1);
         embedView.render(value);
@@ -176,31 +187,40 @@ export const startMaker = (): void => {
     }, 240);
   };
 
-  const generateMaker = (): void => {
+  const regenerateEmbed = (): void => {
+    if (!art || !currentCacheId) return;
+    const generation = resetEmbed();
+    scheduleEmbed(art, studioCfg(), generation, currentCacheId, currentSource, name, currentPaths, currentRectangles, false);
+  };
+
+  const generateStudio = (): void => {
     if (!vector) return;
     const source = vector;
     const sourceValue = currentSource;
     const sourceName = name;
-    const cfg = makerCfg();
+    const cfg = studioCfg();
     const id = cacheId();
-    const local = ++makerGeneration;
+    const local = ++studioGeneration;
     const embedLocal = resetEmbed();
     const highResolution = (cfg.columns ?? 96) > 256;
+    currentCacheId = id;
+    currentPaths = source.paths;
+    currentRectangles = source.rectangles;
     setStatus(highResolution ? "Generating high-resolution art…" : "Rendering…", true);
 
     void (async () => {
       if (highResolution) await new Promise(requestAnimationFrame);
-      if (local !== makerGeneration || vector !== source) return;
+      if (local !== studioGeneration || vector !== source) return;
       const next = makeArt(source.pixels, cfg);
-      if (local !== makerGeneration || vector !== source) return;
+      if (local !== studioGeneration || vector !== source) return;
       art = next;
       metrics.textContent = `${next.columns}×${next.rows} cells · ${(next.density * 100).toFixed(1)}% dots · ${source.paths} paths${next.cellColours ? " · colour" : ""}`;
       await renderDense(output, next);
-      if (local !== makerGeneration || art !== next) return;
+      if (local !== studioGeneration || art !== next) return;
       setStatus("Ready");
       scheduleEmbed(next, cfg, embedLocal, id, sourceValue, sourceName, source.paths, source.rectangles);
     })().catch(error => {
-      if (local !== makerGeneration) return;
+      if (local !== studioGeneration) return;
       setStatus(error instanceof Error ? error.message : "Rendering failed.");
     });
   };
@@ -216,10 +236,10 @@ export const startMaker = (): void => {
     syncHeroColour();
     syncColour(true, theme);
     if (heroPixels) generateHero();
-    if (vector) generateMaker();
+    if (vector) generateStudio();
   };
 
-  const loadMaker = async (source: Blob | string, nextName: string, seedHero = false): Promise<void> => {
+  const loadStudio = async (source: Blob | string, nextName: string, seedHero = false): Promise<void> => {
     const local = ++loadGeneration;
     setStatus("Reading image…", true);
     const decoded = await decodeImage(source);
@@ -231,6 +251,8 @@ export const startMaker = (): void => {
     vector = nextVector;
     currentSource = source;
     name = nextName;
+    currentPaths = nextVector.paths;
+    currentRectangles = nextVector.rectangles;
     if (seedHero) {
       heroPixels = nextVector.pixels;
       if (heroObjectUrl) URL.revokeObjectURL(heroObjectUrl);
@@ -238,7 +260,7 @@ export const startMaker = (): void => {
       heroObjectUrl = decoded.revoke ? decoded.url : null;
       generateHero();
     } else if (decoded.revoke) URL.revokeObjectURL(decoded.url);
-    generateMaker();
+    generateStudio();
   };
 
   const rebuildVector = async (source: Blob | string, nextName: string, local: number): Promise<void> => {
@@ -251,6 +273,8 @@ export const startMaker = (): void => {
       vector = nextVector;
       currentSource = source;
       name = nextName;
+      currentPaths = nextVector.paths;
+      currentRectangles = nextVector.rectangles;
       if (decoded.revoke) URL.revokeObjectURL(decoded.url);
     } catch (error) {
       console.warn("Could not restore the cached source for editing.", error);
@@ -287,13 +311,16 @@ export const startMaker = (): void => {
 
   const restoreCached = async (cached: RestoredArt): Promise<void> => {
     const local = ++loadGeneration;
-    ++makerGeneration;
+    ++studioGeneration;
     window.clearTimeout(embedTimer);
     cancelEmbedHtml();
     const generation = ++embedGeneration;
     vector = null;
     currentSource = cached.source;
     name = cached.name;
+    currentCacheId = cached.id;
+    currentPaths = cached.paths;
+    currentRectangles = cached.rectangles;
     applyCachedControls(cached.cfg);
     art = cached.art;
     metrics.textContent = `${cached.art.columns}×${cached.art.rows} cells · ${(cached.art.density * 100).toFixed(1)}% dots · ${cached.paths} paths${cached.art.cellColours ? " · colour" : ""}`;
@@ -304,6 +331,7 @@ export const startMaker = (): void => {
     embedProgress.hidden = true;
     if (cached.embed !== undefined) {
       embed = cached.embed;
+      storyPayload = storyEmbed(cached.embed);
       embedView.render(cached.embed);
       copyEmbed.disabled = false;
     } else {
@@ -315,8 +343,14 @@ export const startMaker = (): void => {
     void rebuildVector(cached.source, cached.name, local);
   };
 
+  embedView = new EmbedView(embedCode, story => {
+    if (storyPayload === story) return;
+    storyPayload = story;
+    regenerateEmbed();
+  });
+
   let debounce = 0;
-  const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateMaker, 90); };
+  const schedule = (): void => { window.clearTimeout(debounce); debounce = window.setTimeout(generateStudio, 90); };
   for (const control of [contrast, detail, bias, dither, invert]) control.addEventListener("input", schedule);
   bindResolutionGate(columns, columnsValue, resolutionTip, schedule, {
     confirmAboveMax: value => window.confirm(`2K was the last stop. Are nya sure you want to keep going? Your RAM is already at the bus stop trying to get home.\n\nRequested resolution: ${value} cells. This is unsupported and may crash the tab.`),
@@ -331,7 +365,7 @@ export const startMaker = (): void => {
   canvasToggle.addEventListener("change", () => {
     manualCanvasDark = canvasDark();
     syncCanvas();
-    syncMakerPolarity();
+    syncStudioPolarity();
     schedule();
   });
   heroColour.addEventListener("change", () => {
@@ -353,10 +387,10 @@ export const startMaker = (): void => {
     if (theme === "light" || theme === "dark") applyThemeDefaults(theme);
   });
 
-  upload.addEventListener("change", () => { const file = upload.files?.[0]; if (file) void loadMaker(file, file.name.replace(/\.[^.]+$/, "")); });
+  upload.addEventListener("change", () => { const file = upload.files?.[0]; if (file) void loadStudio(file, file.name.replace(/\.[^.]+$/, "")); });
   drop.addEventListener("dragover", event => { event.preventDefault(); drop.dataset.drag = "true"; });
   drop.addEventListener("dragleave", () => delete drop.dataset.drag);
-  drop.addEventListener("drop", event => { event.preventDefault(); delete drop.dataset.drag; const file = event.dataTransfer?.files?.[0]; if (file?.type === "image/png") void loadMaker(file, file.name.replace(/\.[^.]+$/, "")); });
+  drop.addEventListener("drop", event => { event.preventDefault(); delete drop.dataset.drag; const file = event.dataTransfer?.files?.[0]; if (file?.type === "image/png") void loadStudio(file, file.name.replace(/\.[^.]+$/, "")); });
 
   const textOutput = (): string => art ? (art.cellColours ? taggedText(art) : art.text) : "";
   copy.addEventListener("click", async () => { if (!art) return; await navigator.clipboard.writeText(textOutput()); const old = copy.textContent; copy.textContent = "Copied"; setTimeout(() => { copy.textContent = old; }, 900); });
@@ -380,6 +414,6 @@ export const startMaker = (): void => {
       await restoreCached(cached);
       return;
     }
-    await loadMaker("assets/hero.png", "hero", true);
+    await loadStudio("assets/hero.png", "hero", true);
   })();
 };

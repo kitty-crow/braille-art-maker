@@ -12,6 +12,7 @@ interface Request {
   readonly cfg: ArtCfg;
   readonly theme: EmbedTheme;
   readonly surface: EmbedSurface;
+  readonly story: boolean;
 }
 
 interface Response {
@@ -32,9 +33,9 @@ self.addEventListener("message", event => {
         self.postMessage({ id: request.id, progress: value } satisfies Response);
       };
       const data = request.raw
-        ? await packRawEmbedSmall(request.raw, progress)
+        ? await packRawEmbedSmall(request.raw, progress, request.story)
         : request.art
-          ? await packEmbedSmall(request.art, request.cfg, progress)
+          ? await packEmbedSmall(request.art, request.cfg, progress, request.story)
           : (() => { throw new Error("Embed worker received no Unicode art."); })();
       const html = fill.make({
         data,

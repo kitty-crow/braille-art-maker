@@ -5,7 +5,7 @@ import { join } from "node:path";
 const root = join(import.meta.dir, "..");
 const read = (path: string): Promise<string> => readFile(join(root, path), "utf8");
 
-test("compact maker rows are forbidden through the stable 256-cell range", async () => {
+test("compact studio rows are forbidden through the stable 256-cell range", async () => {
   const dense = await read("src/web/dense.ts");
   const css = await read("web/styles/unicode.css");
   expect(dense).toContain("const compactAbove = 256;");
@@ -33,7 +33,7 @@ test("compact rows require exact geometry for all 256 Braille glyphs", async () 
   expect(probe).toContain("span.style.letterSpacing = \"0\";");
 });
 
-test("very-high-resolution maker fallback bounds live DOM with seam-free fixed Unicode chunks", async () => {
+test("very-high-resolution studio fallback bounds live DOM with seam-free fixed Unicode chunks", async () => {
   const dense = await read("src/web/dense.ts");
   const css = await read("web/styles/unicode.css");
   expect(dense).toContain("const chunkAbove = 768;");
@@ -53,7 +53,7 @@ test("very-high-resolution maker fallback bounds live DOM with seam-free fixed U
   expect(css).toContain(".unicode-chunk{position:absolute;");
 });
 
-test("maker high-resolution rendering is cooperative, interlaced and never artificially frame-throttled", async () => {
+test("studio high-resolution rendering is cooperative, interlaced and never artificially frame-throttled", async () => {
   const dense = await read("src/web/dense.ts");
   expect(dense).toContain("const paintBudgetMs = 12;");
   expect(dense).toContain("for (const parity of [0, 1] as const)");
@@ -90,10 +90,11 @@ test("embed runtime has the same proof gate and unthrottled progressive exact re
   expect(css).toContain('.grid[data-unicode-render="rows"] .row');
 });
 
-test("high-resolution u4 avoids the unsafe ultra candidate family", async () => {
+test("high-resolution u4 avoids the unsafe ultra candidate family in both Compact payload modes", async () => {
   const search = await read("src/embed/ultra-search.ts");
   expect(search).toContain("const fullSearchColumns = 256;");
-  expect(search).toContain("if (art.columns > fullSearchColumns) return packBounded(art, cfg, brotli, progress);");
+  expect(search).toContain("if (art.columns > fullSearchColumns) return packStoryBounded(art, cfg, brotli, progress);");
+  expect(search).toContain("if (art.columns > fullSearchColumns) return packCompactBounded(art, cfg, brotli, progress);");
   expect(search).toContain("const candidates = packRawV2Candidates(art, cfg);");
   expect(search).not.toContain("readonly deflated:");
 });
@@ -107,19 +108,21 @@ test("high-resolution browser encoding transfers one bounded raw buffer instead 
   expect(web).toContain("[raw.buffer as ArrayBuffer]");
   expect(web).toContain("const oneShot = art.columns > transferAbove;");
   expect(web).toContain("if (wait.oneShot && pending.size === 0) disposeWorker();");
+  expect(web).toContain("{ id, raw, cfg, theme, surface, story }");
   expect(raw).toContain("const chunkSize = 64 * 1024;");
   expect(raw).toContain("export const packBoundedRaw");
   expect(worker).toContain("packRawEmbedSmall");
+  expect(worker).toContain("request.story");
 });
 
 test("high-resolution preview finishes before embed compression starts", async () => {
-  const maker = await read("src/web/maker.ts");
-  const renderAt = maker.indexOf("await renderDense(output, next);");
-  const embedAt = maker.indexOf("scheduleEmbed(next, cfg, embedLocal, id");
+  const studio = await read("src/web/studio.ts");
+  const renderAt = studio.indexOf("await renderDense(output, next);");
+  const embedAt = studio.indexOf("scheduleEmbed(next, cfg, embedLocal, id");
   expect(renderAt).toBeGreaterThan(-1);
   expect(embedAt).toBeGreaterThan(renderAt);
-  expect(maker).toContain("cancelEmbedHtml();");
-  expect(maker).toContain("Generating high-resolution art…");
+  expect(studio).toContain("cancelEmbedHtml();");
+  expect(studio).toContain("Generating high-resolution art…");
 });
 
 test("resolution input commits rendering only after interaction settles", async () => {
@@ -138,7 +141,7 @@ test("resolution input commits rendering only after interaction settles", async 
 
 test("resolution gates include 765 and 1K jokes while manual values remain unbounded", async () => {
   const html = await read("web/index.html");
-  const maker = await read("src/web/maker.ts");
+  const studio = await read("src/web/studio.ts");
   const gate = await read("src/web/resolution.ts");
   const size = await read("src/core/size.ts");
   const art = await read("src/core/art.ts");
@@ -151,11 +154,11 @@ test("resolution gates include 765 and 1K jokes while manual values remain unbou
   expect(gate).toContain('1K? Are nya crazy?! I’d hate to be your RAM right meow!');
   expect(gate).toContain("const normaliseManual = (value: number): number => Math.max(min, Math.round(value));");
   expect(gate).toContain("opts.confirmAboveMax(next, max)");
-  expect(maker).toContain("const resolutionMax = 2048;");
-  expect(maker).toContain('columnsValue.removeAttribute("max");');
-  expect(maker).toContain("columns: Number(columnsValue.value)");
-  expect(maker).toContain("2K was the last stop. Are nya sure you want to keep going?");
-  expect(maker).toContain("This is unsupported and may crash the tab.");
+  expect(studio).toContain("const resolutionMax = 2048;");
+  expect(studio).toContain('columnsValue.removeAttribute("max");');
+  expect(studio).toContain("columns: Number(columnsValue.value)");
+  expect(studio).toContain("2K was the last stop. Are nya sure you want to keep going?");
+  expect(studio).toContain("This is unsupported and may crash the tab.");
   expect(size).toContain("export const maxColumns = 2048;");
   expect(size).not.toContain("Math.min(maxColumns");
   expect(art).not.toContain("Math.min(maxColumns");
