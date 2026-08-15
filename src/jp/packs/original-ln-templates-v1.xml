@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<corpus id="original-ln-templates-v1" version="1">
+  <entry id="tpl-001" kind="template">{person}は{place}で{object}を{transitive}。</entry>
+  <entry id="tpl-002" kind="template">{object}が見つからなかったので、{person}は{place}へ向かった。</entry>
+  <entry id="tpl-003" kind="template">「{dialogue}」と{person}は言った。</entry>
+  <entry id="tpl-004" kind="template">{object}を探しているあいだ、{person}は{place}で{intransitive}。</entry>
+  <entry id="tpl-005" kind="template">{connector}、{person}によれば、{object}は{place}にあるらしい。</entry>
+  <entry id="tpl-006" kind="template">{place}では、{person}が{object}を調べたり、{person}が{object2}を隠したりしていた。</entry>
+  <entry id="tpl-007" kind="template">{person}が{place}で見つけた{object}を、{subject}は{transitive}。</entry>
+  <entry id="tpl-008" kind="template">もし{object}が本物なら、{person}は{place}へ行くつもりだった。</entry>
+  <entry id="tpl-009" kind="template">{object}は大切なもののはずなのに、{person}は{place}に置き忘れていた。</entry>
+  <entry id="tpl-010" kind="template">{object}を確かめるために、{person}は{place}へ向かった。</entry>
+  <entry id="tpl-011" kind="template">{person}が{place}へ戻る前に、{object}は誰かに持ち去られていた。</entry>
+  <entry id="tpl-012" kind="template">{object}が偽物でも、{person}は気にしないらしい。</entry>
+  <entry id="tpl-013" kind="template">{person}は{object}よりも{object2}のほうを気にしていた。</entry>
+  <entry id="tpl-014" kind="template">{place}から{object}が消えたらしく、{person}はしばらく黙っていた。</entry>
+  <entry id="tpl-015" kind="template">{object}を見つけると、{person}は「{dialogue}」と言った。</entry>
+  <entry id="tpl-016" kind="template">{person}は{place}へ{motion}のに、{subject}は{place2}で{object}を{transitive}。</entry>
+  <entry id="tpl-017" kind="template">{subject}が{place}で{object}を{transitive}ので、{person}は{place2}で{intransitive}。</entry>
+  <entry id="tpl-018" kind="template">{person}は{object}を手に取ったまま、{place}で{intransitive}。</entry>
+  <entry id="tpl-019" kind="template">{connector}、{object}のことを知っているのは{person}だけだった。</entry>
+  <entry id="tpl-020" kind="template">{person}に{object}を見せると、{subject}は急に黙った。</entry>
+  <entry id="tpl-021" kind="template">{object}が{place}に残されていることを、{person}はまだ知らなかった。</entry>
+  <entry id="tpl-022" kind="template">{person}が「{dialogue}」と言ったあと、{subject}は{object}を{transitive}。</entry>
+  <entry id="tpl-023" kind="template">{place}へ向かう途中で、{person}は{object}を見つけた。</entry>
+  <entry id="tpl-024" kind="template">{object}について尋ねられると、{person}は少し困ったように笑った。</entry>
+  <entry id="tpl-025" kind="template">{person}が{object}を持っているという噂は、{place}にも届いていた。</entry>
+  <entry id="tpl-026" kind="template">{connector}、{person}は{object}を{transitiveDict}ことにした。</entry>
+  <entry id="tpl-027" kind="template">{person}は{object}を{transitiveDict}つもりだったが、{place}で{intransitive}。</entry>
+  <entry id="tpl-028" kind="template">{object}を{transitiveDict}前に、{person}は{place}で{object2}を見つけた。</entry>
+  <entry id="tpl-029" kind="template">{person}が{place}へ{motionDict}と、{object}はもうそこになかった。</entry>
+  <entry id="tpl-030" kind="template">「{dialogue}」と聞いて、{person}は{object}を{transitiveDict}のをやめた。</entry>
+</corpus>
