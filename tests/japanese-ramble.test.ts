@@ -9,8 +9,8 @@ const root = join(import.meta.dir, "..");
 test("bundled Japanese corpus is local, sizeable and structurally complete", () => {
   expect(originalLnCorpus.id).toBe("original-ln-v1");
   expect(originalLnCorpus.version).toBe(1);
-  expect(originalLnCorpus.entries.length).toBeGreaterThanOrEqual(340);
-  for (const kind of ["person", "noun", "place", "object", "verb", "adjective", "connector", "dialogue"] as const) {
+  expect(originalLnCorpus.entries.length).toBeGreaterThanOrEqual(370);
+  for (const kind of ["person", "noun", "place", "object", "verb", "adjective", "connector", "dialogue", "template"] as const) {
     expect(originalLnCorpus.entries.some(entry => entry.kind === kind)).toBe(true);
   }
 });
@@ -31,10 +31,18 @@ test("Japanese ramble changes when J8192 entropy changes", () => {
   expect(a).not.toBe(b);
 });
 
+test("corpus templates resolve completely into Japanese prose", () => {
+  const values = Array.from({ length: 512 }, (_, i) => (i * 811 + 97) & 0x1fff);
+  const out = japaneseRamble(originalLnCorpus, entropy13(values), { sentences: 64 });
+  expect(out.split("\n")).toHaveLength(64);
+  expect(out).not.toMatch(/[{}|]/u);
+  expect(out.split("\n").every(sentence => sentence.endsWith("。"))).toBe(true);
+});
+
 test("ramble caps requested output without changing the corpus", () => {
   const out = japaneseRamble(originalLnCorpus, entropy13([99]), { sentences: 500 });
   expect(out.split("\n")).toHaveLength(64);
-  expect(originalLnCorpus.entries.length).toBeGreaterThanOrEqual(340);
+  expect(originalLnCorpus.entries.length).toBeGreaterThanOrEqual(370);
 });
 
 test("maker exposes Japanese Ramble as a local presentation without changing copy semantics", async () => {
@@ -45,6 +53,7 @@ test("maker exposes Japanese Ramble as a local presentation without changing cop
   const defaults = local[0]!;
   expect(defaults).toContain("original-ln-court-mystery-v1.xml");
   expect(defaults).toContain("original-ln-romance-books-magic-v1.xml");
+  expect(defaults).toContain("original-ln-templates-v1.xml");
   expect(view).toContain('this.rambleTab = this.tab("Japanese Ramble", "ramble", false);');
   expect(view).toContain('this.renderRamble(this.compact);');
   expect(view).toContain('j8192EntropyValues(packed.data)');
