@@ -1,16 +1,13 @@
-import type { EmbedCodec, PackedEmbed } from "../embed/codec.ts";
-import { staticArtHtml } from "../embed/static-html.ts";
+import type { EmbedCodec } from "../embed/codec.ts";
+import { staticPackedHtml } from "../embed/static-html.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
-import type { Art, ArtCfg } from "../types.ts";
-import { finishCacheRestore } from "./cache-guard.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
 interface HighlightApi { highlightElement(node: HTMLElement): void; }
 interface Libs { readonly marked: MarkedApi; readonly purify: PurifyApi; readonly highlight: HighlightApi; }
 type Mode = "compact" | "static";
-
-declare const __WEB_VERSION__: string;
+interface MaskedPayload { readonly source: string; readonly token: string; readonly payload: string; }
 
 const src = {
   marked: "https://cdn.jsdelivr.net/npm/marked@18.0.7/lib/marked.umd.js",
@@ -19,6 +16,7 @@ const src = {
 } as const;
 const loads = new Map<string, Promise<void>>();
 const richHighlightLimit = 96_000;
+const payloadToken = "__UNICODE_ART_PACKED_PAYLOAD__";
 
 const win = (): {
   readonly marked?: MarkedApi;
@@ -66,34 +64,44 @@ const fence = (value: string): string => {
   return "`".repeat(Math.max(3, longest + 1));
 };
 
-const textFromMasks = (packed: PackedEmbed): string => {
-  const lines = new Array<string>(packed.rows);
-  for (let y = 0; y < packed.rows; y += 1) {
-    let line = "";
-    const offset = y * packed.columns;
-    for (let x = 0; x < packed.columns; x += 1) line += String.fromCodePoint(0x2800 + (packed.masks[offset + x] ?? 0));
-    lines[y] = line;
-  }
-  return lines.join("\n");
+const maskCompactPayload = (source: string): MaskedPayload | null => {
+  const marker = source.indexOf("data-unicode-art-data");
+  if (marker < 0) return null;
+  const open = source.lastIndexOf("<script", marker);
+  const start = source.indexOf(">", marker);
+  const end = start < 0 ? -1 : source.indexOf("</script>", start + 1);
+  if (open < 0 || start < 0 || end < 0) return null;
+  const payload = source.slice(start + 1, end);
+  if (!payload) return null;
+  return {
+    source: `${source.slice(0, start + 1)}${payloadToken}${source.slice(end)}`,
+    token: payloadToken,
+    payload,
+  };
 };
 
-const artFromPacked = (packed: PackedEmbed): { art: Art; cfg: ArtCfg } => ({
-  art: {
-    text: textFromMasks(packed),
-    columns: packed.columns,
-    rows: packed.rows,
-    dotsWidth: packed.columns * 2,
-    dotsHeight: packed.rows * 4,
-    threshold: 0,
-    density: 0,
-    ...(packed.cellColours ? { cellColours: packed.cellColours } : {}),
-  },
-  cfg: {
-    colour: packed.colour,
-    colourBackground: packed.colourBackground,
-    fullColour: packed.fullColour,
-  },
-});
+const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean => {
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const text = node as Text;
+    const at = text.data.indexOf(masked.token);
+    if (at >= 0) {
+      const fragment = document.createDocumentFragment();
+      if (at > 0) fragment.append(document.createTextNode(text.data.slice(0, at)));
+      const payload = document.createElement("span");
+      payload.className = "hljs-string";
+      payload.textContent = masked.payload;
+      fragment.append(payload);
+      const after = text.data.slice(at + masked.token.length);
+      if (after) fragment.append(document.createTextNode(after));
+      text.replaceWith(fragment);
+      return true;
+    }
+    node = walker.nextNode();
+  }
+  return false;
+};
 
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -138,7 +146,6 @@ export class EmbedView {
     ++this.staticGeneration;
     if (!source) {
       this.host.replaceChildren();
-      finishCacheRestore(__WEB_VERSION__);
       return;
     }
     if (this.mode === "static") void this.showStatic();
@@ -183,8 +190,7 @@ export class EmbedView {
       const packed = packedSource(compact);
       const decoded = await unpackEmbedSmall(packed.data, packed.codec);
       if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      const value = artFromPacked(decoded);
-      const html = staticArtHtml(value.art, value.cfg);
+      const html = staticPackedHtml(decoded);
       if (generation !== this.staticGeneration || compact !== this.compact) return "";
       this.staticHtml = html;
       if (this.mode === "static") this.renderCode(html);
@@ -212,28 +218,31 @@ export class EmbedView {
 
   private renderCode(source: string): void {
     const generation = ++this.renderGeneration;
-    // Syntax-highlighting a multi-megabyte packed/static embed duplicates the source several
-    // times through Markdown parsing, sanitising and token spans. Keep huge payloads as one
-    // plain text node; the copied source remains byte-for-byte identical.
     if (source.length > richHighlightLimit) {
+      const masked = maskCompactPayload(source);
+      if (masked) {
+        void this.marked(source, generation, masked);
+        return;
+      }
       this.plain(source);
       return;
     }
     void this.marked(source, generation);
   }
 
-  private async marked(source: string, generation: number): Promise<void> {
+  private async marked(source: string, generation: number, masked?: MaskedPayload): Promise<void> {
     try {
       const api = await libs();
       if (generation !== this.renderGeneration) return;
-      const ticks = fence(source);
-      const rendered = await api.marked.parse(`${ticks}html\n${source}\n${ticks}`);
+      const display = masked?.source ?? source;
+      const ticks = fence(display);
+      const rendered = await api.marked.parse(`${ticks}html\n${display}\n${ticks}`);
       if (generation !== this.renderGeneration) return;
       this.host.innerHTML = api.purify.sanitize(String(rendered));
       const blocks = this.host.querySelectorAll<HTMLElement>("pre code");
       if (blocks.length === 0) { this.plain(source); return; }
       blocks.forEach(block => api.highlight.highlightElement(block));
-      finishCacheRestore(__WEB_VERSION__);
+      if (masked && !restoreMaskedPayload(this.host, masked)) this.plain(source);
     } catch {
       if (generation === this.renderGeneration) this.plain(source);
     }
@@ -246,7 +255,6 @@ export class EmbedView {
     code.textContent = source;
     pre.append(code);
     this.host.replaceChildren(pre);
-    finishCacheRestore(__WEB_VERSION__);
   }
 
   private message(text: string): void {

@@ -1,6 +1,6 @@
 import { unpackBoundedRaw } from "../embed/bounded-raw.ts";
 import type { Art, ArtCfg } from "../types.ts";
-import { beginCacheRestore, clearCacheRestoreOnCleanExit, finishCacheRestore } from "./cache-guard.ts";
+import { beginCacheRestore, finishCacheRestore } from "./cache-guard.ts";
 
 const dbName = "unicode-art-maker-cache";
 const dbVersion = 2;
@@ -9,6 +9,7 @@ const sessionStore = "session-v2";
 const artStore = "art-v2";
 const embedStore = "embed-v2";
 const latestKey = "latest";
+const restoreSettleMs = 10_000;
 
 interface ArtMeta {
   readonly columns: number;
@@ -59,9 +60,6 @@ const db = (): Promise<IDBDatabase> => {
     const request = indexedDB.open(dbName, dbVersion);
     request.addEventListener("upgradeneeded", () => {
       const value = request.result;
-      // v0.4.18 used the legacy `art` store for structured-cloned Art objects. Keep it
-      // untouched so upgrading an existing browser database is non-destructive; v2 uses
-      // compact Blob-backed stores instead.
       if (!value.objectStoreNames.contains(legacyStore)) value.createObjectStore(legacyStore);
       if (!value.objectStoreNames.contains(sessionStore)) value.createObjectStore(sessionStore);
       if (!value.objectStoreNames.contains(artStore)) value.createObjectStore(artStore);
@@ -164,14 +162,13 @@ export const clearCachedArt = async (): Promise<void> => {
 };
 
 export const loadCachedArt = async (version: string): Promise<RestoredArt | null> => {
-  // If a previous page process died while restoring this exact version, the marker survives
-  // in localStorage. Discard that latest snapshot once so a bad/high-pressure cache cannot
-  // trap the tab in a reload -> restore -> crash loop.
+  // Keep the marker alive through the dangerous startup window. If the page process dies while
+  // rendering/rebuilding a large cached result, the next load drops the snapshot instead of
+  // attempting it forever. A page that remains alive clears the marker after the restore settles.
   if (!beginCacheRestore(version)) {
     await clearCachedArt().catch(() => {});
     return null;
   }
-  clearCacheRestoreOnCleanExit(version);
 
   try {
     const value = await db();
@@ -191,6 +188,7 @@ export const loadCachedArt = async (version: string): Promise<RestoredArt | null
     }
     const art = restoreArt(new Uint8Array(await rawBlob.arrayBuffer()), session.art);
     const embed = cachedEmbed?.version === version && cachedEmbed.id === session.id ? await cachedEmbed.html.text() : undefined;
+    setTimeout(() => finishCacheRestore(version), restoreSettleMs);
     return {
       id: session.id,
       name: session.name,
