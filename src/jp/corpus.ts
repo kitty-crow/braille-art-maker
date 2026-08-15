@@ -1,7 +1,7 @@
 export interface CorpusEntry {
   readonly id: string;
   readonly text: string;
-  readonly kind: "noun" | "person" | "place" | "object" | "verb" | "adjective" | "connector" | "dialogue";
+  readonly kind: "noun" | "person" | "place" | "object" | "verb" | "adjective" | "connector" | "dialogue" | "template";
   readonly tags: readonly string[];
 }
 
@@ -36,7 +36,7 @@ export const parseCorpusXml = (source: string): CorpusPack => {
     const meta = attrs(match[1] ?? "");
     const kind = meta.kind as CorpusEntry["kind"] | undefined;
     if (!meta.id || !kind) throw new Error("Japanese corpus entry metadata is incomplete.");
-    if (!["noun", "person", "place", "object", "verb", "adjective", "connector", "dialogue"].includes(kind)) {
+    if (!["noun", "person", "place", "object", "verb", "adjective", "connector", "dialogue", "template"].includes(kind)) {
       throw new Error(`Unsupported Japanese corpus entry kind: ${kind}`);
     }
     const text = unescapeXml((match[2] ?? "").trim());
