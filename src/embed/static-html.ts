@@ -18,7 +18,7 @@ const colourStyle = (colour?: CellColour): string => {
     .join(";");
 };
 
-const rowsWithColour = (art: Art, cellW: string, cellH: string, fontSize: string): string => {
+const rowsWithColour = (art: Art, fallbackCell: number, cellH: string, fontSize: string): string => {
   const lines = art.text.split("\n");
   let at = 0;
   return lines.map(line => {
@@ -29,13 +29,17 @@ const rowsWithColour = (art: Art, cellW: string, cellH: string, fontSize: string
       const style = colourStyle(art.cellColours?.[at + start]);
       let end = start + 1;
       while (end < chars.length && colourStyle(art.cellColours?.[at + end]) === style) end += 1;
+      const count = end - start;
       const text = esc(chars.slice(start, end).join(""));
-      const width = `calc(${end - start} * ${cellW})`;
-      runs.push(`<span style="display:inline-block;width:${width};height:${cellH};line-height:${cellH};font-size:${fontSize};white-space:pre;overflow:visible;vertical-align:top;${style}">${text}</span>`);
+      const fallbackWidth = `${(count * fallbackCell).toFixed(4)}px`;
+      const width = `${(count * 100 / art.columns).toFixed(8)}cqw`;
+      const fallbackHeight = `${(fallbackCell * 2).toFixed(4)}px`;
+      runs.push(`<span style="display:inline-block;width:${fallbackWidth};width:${width};height:${fallbackHeight};height:${cellH};line-height:${fallbackHeight};line-height:${cellH};font-size:${fontSize};white-space:pre;overflow:visible;vertical-align:top;${style}">${text}</span>`);
       start = end;
     }
     at += art.columns;
-    return `<div style="width:100cqw;height:${cellH};line-height:${cellH};white-space:nowrap;overflow:visible">${runs.join("")}</div>`;
+    const fallbackHeight = `${(fallbackCell * 2).toFixed(4)}px`;
+    return `<div style="width:${(art.columns * fallbackCell).toFixed(4)}px;width:100cqw;height:${fallbackHeight};height:${cellH};line-height:${fallbackHeight};line-height:${cellH};white-space:nowrap;overflow:visible">${runs.join("")}</div>`;
   }).join("");
 };
 
@@ -48,7 +52,6 @@ const rowsWithColour = (art: Art, cellW: string, cellH: string, fontSize: string
 export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => {
   const columns = Math.max(1, art.columns);
   const fallbackCell = 640 / columns;
-  const cellW = `${(100 / columns).toFixed(8)}cqw`;
   const cellH = `${(200 / columns).toFixed(8)}cqw`;
   const fontSize = `${(160 / columns).toFixed(8)}cqw`;
   const foregroundOnly = cfg.colour === true && cfg.fullColour !== true;
@@ -63,5 +66,5 @@ export const staticArtHtml = (art: Art, cfg: ArtCfg = {}): string => {
   }
 
   const fallbackGrid = `font-size:${(fallbackCell * 1.6).toFixed(4)}px;line-height:${(fallbackCell * 2).toFixed(4)}px`;
-  return `<div role="img" aria-label="Generated Unicode art" style="${outer}"><div style="${common};${fallbackGrid};font-size:${fontSize};line-height:${cellH};width:100cqw;overflow:visible">${rowsWithColour(art, cellW, cellH, fontSize)}</div></div>`;
+  return `<div role="img" aria-label="Generated Unicode art" style="${outer}"><div style="${common};${fallbackGrid};font-size:${fontSize};line-height:${cellH};width:${(columns * fallbackCell).toFixed(4)}px;width:100cqw;overflow:visible">${rowsWithColour(art, fallbackCell, cellH, fontSize)}</div></div>`;
 };
