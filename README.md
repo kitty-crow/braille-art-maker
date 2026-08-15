@@ -82,6 +82,8 @@ The CLI does not impose the browser slider's 2048-cell ceiling. Very large resol
 
 The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
+The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal small runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the existing copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+
 `u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
 
 Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
