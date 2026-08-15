@@ -3,9 +3,9 @@
 GitHub Pages publishes the browser embed assets at:
 
 ```text
-https://kitty-crow.github.io/braille-art-maker/v1/embed.js
-https://kitty-crow.github.io/braille-art-maker/v1/embed.css
-https://kitty-crow.github.io/braille-art-maker/v1/load.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.css
+https://kitty-crow.github.io/unicode-art-studio/v1/load.js
 ```
 
 The embed carries the generated result itself. The source PNG does not need to be hosted or sent anywhere after conversion.
@@ -18,17 +18,23 @@ Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas a
 
 Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
 
+Compact has two lossless ways to write the selected compressed bytes. **Super compact** is optimised for the shortest source/clipboard character count. **Payload as a story**, also described as the light-novel encoding, writes those same bytes as reversible Japanese prose. These are transport representations only: switching between them does not rerender, revectorise or otherwise change the artwork.
+
 ### Super compact
 
 The default Compact payload compares two text transports for each binary candidate. The established basE91 transport remains available and is the byte-efficient ASCII form. **J8192** maps each 13 bits to one of exactly 8,192 normalisation-stable BMP characters drawn from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. A small explicit marker records compression mode and the final 0–12 meaningful tail bits so arbitrary binary payloads round-trip exactly.
 
 The optimiser chooses the shortest JavaScript/clipboard character count, not the fewest UTF-8 bytes. J8192 therefore normally wins for non-trivial payloads because it carries 13 bits per character versus roughly 6.5 bits per basE91 character. Encoding and decoding are linear bit packing/unpacking; Brotli remains the expensive part.
 
-### Payload as a story
+J8192 may look Japanese, but it is not prose and it does not describe the image. Its characters are a dense reversible alphabet carrying binary bits, much like a higher-capacity textual base encoding.
+
+### Payload as a story (light-novel encoding)
 
 The Studio's Compact panel includes **Payload as a story**. When checked, the exact same compressed image bytes are encoded as deterministic Japanese prose instead of basE91/J8192.
 
 The prose is the payload. Grammar-template selection and the selected people, places, objects, verbs and other lexical choices are mixed-radix digits. Decoding those choices reconstructs the exact compression mode and exact byte stream before normal `u4` unpacking. The payload remains one physical line inside `data-unicode-art-data`; changing the prose changes or corrupts the image.
+
+"Light-novel encoding" is a description of the resulting style, not an AI interpretation of the PNG. No model looks at the picture and writes a story about it. The encoder deterministically chooses grammatical templates and words because each choice carries part of the binary value. The resulting surreal prose is therefore both readable-looking text and the actual reversible data representation.
 
 The grammar and lexicon are bundled locally as XML. Story mode performs no corpus fetch and calls no corpus API. It is intentionally larger than super-compact mode because grammatical Japanese carries fewer payload bits per visible character.
 
