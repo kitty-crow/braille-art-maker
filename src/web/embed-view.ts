@@ -1,7 +1,6 @@
-import type { EmbedCodec, PackedEmbed } from "../embed/codec.ts";
-import { staticArtHtml } from "../embed/static-html.ts";
+import type { EmbedCodec } from "../embed/codec.ts";
+import { staticPackedHtml } from "../embed/static-html.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
-import type { Art, ArtCfg } from "../types.ts";
 
 interface MarkedApi { parse(src: string): string | Promise<string>; }
 interface PurifyApi { sanitize(src: string): string; }
@@ -104,35 +103,6 @@ const restoreMaskedPayload = (host: HTMLElement, masked: MaskedPayload): boolean
   return false;
 };
 
-const textFromMasks = (packed: PackedEmbed): string => {
-  const lines = new Array<string>(packed.rows);
-  for (let y = 0; y < packed.rows; y += 1) {
-    let line = "";
-    const offset = y * packed.columns;
-    for (let x = 0; x < packed.columns; x += 1) line += String.fromCodePoint(0x2800 + (packed.masks[offset + x] ?? 0));
-    lines[y] = line;
-  }
-  return lines.join("\n");
-};
-
-const artFromPacked = (packed: PackedEmbed): { art: Art; cfg: ArtCfg } => ({
-  art: {
-    text: textFromMasks(packed),
-    columns: packed.columns,
-    rows: packed.rows,
-    dotsWidth: packed.columns * 2,
-    dotsHeight: packed.rows * 4,
-    threshold: 0,
-    density: 0,
-    ...(packed.cellColours ? { cellColours: packed.cellColours } : {}),
-  },
-  cfg: {
-    colour: packed.colour,
-    colourBackground: packed.colourBackground,
-    fullColour: packed.fullColour,
-  },
-});
-
 const packedSource = (html: string): { codec: EmbedCodec; data: string } => {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const envelope = doc.querySelector<HTMLScriptElement>('script[type="application/octet-stream"][data-unicode-art-data]')?.textContent?.trim() ?? "";
@@ -220,8 +190,7 @@ export class EmbedView {
       const packed = packedSource(compact);
       const decoded = await unpackEmbedSmall(packed.data, packed.codec);
       if (generation !== this.staticGeneration || compact !== this.compact) return "";
-      const value = artFromPacked(decoded);
-      const html = staticArtHtml(value.art, value.cfg);
+      const html = staticPackedHtml(decoded);
       if (generation !== this.staticGeneration || compact !== this.compact) return "";
       this.staticHtml = html;
       if (this.mode === "static") this.renderCode(html);
@@ -255,8 +224,6 @@ export class EmbedView {
         void this.marked(source, generation, masked);
         return;
       }
-      // Static no-JS HTML can contain millions of repeated span tags. Keep that representation
-      // as a single plain text node rather than creating a syntax-token DOM of comparable size.
       this.plain(source);
       return;
     }
