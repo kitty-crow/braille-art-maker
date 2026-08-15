@@ -9,6 +9,7 @@ const sessionStore = "session-v2";
 const artStore = "art-v2";
 const embedStore = "embed-v2";
 const latestKey = "latest";
+const restoreSettleMs = 10_000;
 
 interface ArtMeta {
   readonly columns: number;
@@ -161,9 +162,9 @@ export const clearCachedArt = async (): Promise<void> => {
 };
 
 export const loadCachedArt = async (version: string): Promise<RestoredArt | null> => {
-  // The marker is intentionally left pending until the maker explicitly finishes the whole
-  // restore transaction. If the page process dies anywhere during render/source rebuild, the
-  // next load drops this snapshot instead of entering a restore crash loop.
+  // Keep the marker alive through the dangerous startup window. If the page process dies while
+  // rendering/rebuilding a large cached result, the next load drops the snapshot instead of
+  // attempting it forever. A page that remains alive clears the marker after the restore settles.
   if (!beginCacheRestore(version)) {
     await clearCachedArt().catch(() => {});
     return null;
@@ -187,6 +188,7 @@ export const loadCachedArt = async (version: string): Promise<RestoredArt | null
     }
     const art = restoreArt(new Uint8Array(await rawBlob.arrayBuffer()), session.art);
     const embed = cachedEmbed?.version === version && cachedEmbed.id === session.id ? await cachedEmbed.html.text() : undefined;
+    setTimeout(() => finishCacheRestore(version), restoreSettleMs);
     return {
       id: session.id,
       name: session.name,
