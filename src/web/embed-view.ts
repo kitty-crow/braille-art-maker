@@ -184,9 +184,15 @@ export class EmbedView {
     return `${artifact.preview}\n<!-- Preview truncated in the maker. Copy embed copies the complete self-contained HTML. -->`;
   }
 
+  private renderStaticPreview(artifact: StaticArtifact): void {
+    const source = this.staticPreview(artifact);
+    const generation = ++this.renderGeneration;
+    void this.marked(source, generation);
+  }
+
   private async showStatic(): Promise<StaticArtifact | null> {
     if (this.staticArtifact) {
-      this.renderCode(this.staticPreview(this.staticArtifact));
+      this.renderStaticPreview(this.staticArtifact);
       return this.staticArtifact;
     }
     const compact = this.compact;
@@ -199,7 +205,7 @@ export class EmbedView {
       const artifact = await makeStaticArtifact(decoded);
       if (generation !== this.staticGeneration || compact !== this.compact) return null;
       this.staticArtifact = artifact;
-      if (this.mode === "static") this.renderCode(this.staticPreview(artifact));
+      if (this.mode === "static") this.renderStaticPreview(artifact);
       return artifact;
     } catch (error) {
       if (generation !== this.staticGeneration || compact !== this.compact) return null;
