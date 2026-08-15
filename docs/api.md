@@ -14,4 +14,4 @@ fullColour?: boolean
 
 `packEmbed(art, cfg, codec)` and `unpackEmbed(data, codec)` retain the synchronous `u1`/`u2` compatibility API.
 
-`packEmbedSmall(art, cfg)` creates the current `u4` payload. It searches multiple exact mask and colour representations, compares raw, maximum-DEFLATE and Brotli-11 transports within a bounded search budget, and emits the shortest result as safe ASCII basE91. `unpackEmbedSmall(data, codec)` decodes `u4` and remains compatible with `u1`, `u2` and `u3`.
+`packEmbedSmall(art, cfg, story?)` creates a `u4` payload. By default it searches multiple exact mask and colour representations, compares raw, maximum-DEFLATE and Brotli-11 candidates within a bounded search budget, then chooses the shorter safe basE91/J8192 transport. Passing `true` for `story` encodes the selected compressed bytes as the reversible single-line Japanese **Payload as a story** representation instead. `unpackEmbedSmall(data, codec)` decodes both forms and remains compatible with earlier `u1`, `u2`, `u3` and `u4` transports.

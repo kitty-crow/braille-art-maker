@@ -104,12 +104,15 @@ test("static geometry uses the same square-host limiting axis as compact runtime
   expect(html).toContain("line-height:25.00000000cqw");
 });
 
-test("embed code view uses streamed static artifacts, bounded Marked preview and Blob clipboard copy", async () => {
+test("embed code view uses Compact story option, streamed static artifacts and Blob clipboard copy", async () => {
   const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
   expect(view).toContain('this.tab("Compact", "compact", true)');
   expect(view).toContain('this.tab("No JavaScript", "static", false)');
+  expect(view).toContain('document.createTextNode(" Payload as a story")');
+  expect(view).toContain("See README → Compact payload modes.");
+  expect(view).toContain("this.compactOptions.hidden = mode !== \"compact\";");
   expect(view).toContain("makeStaticArtifact(decoded)");
-  expect(view).toContain("Preview truncated in the maker");
+  expect(view).toContain("Preview truncated in the studio");
   expect(view).toContain("private renderStaticPreview(artifact: StaticArtifact): void");
   expect(view).toContain("void this.marked(source, generation);");
   expect(view).toContain("this.renderStaticPreview(this.staticArtifact);");

@@ -5,7 +5,7 @@ const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)]
 const fileName = async (blob: Blob, ext: string): Promise<string> => {
   const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
   const suffix = ext.replace(/^\.+/u, "");
-  return `kitty-crow-github-io-unicode-art-maker-${hex(digest)}.${suffix}`;
+  return `kitty-crow-github-io-unicode-art-studio-${hex(digest)}.${suffix}`;
 };
 
 export const download = async (ext: string, type: string, body: BlobPart): Promise<string> => {

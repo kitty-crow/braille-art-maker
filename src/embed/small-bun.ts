@@ -15,7 +15,7 @@ const compress = (bytes: Uint8Array): Uint8Array => new Uint8Array(brotliCompres
 const brotliDecode = (bytes: Uint8Array): Uint8Array => new Uint8Array(brotliDecompressSync(bytes));
 const unpackBytes = (bytes: Uint8Array): PackedEmbed => isUltraRaw(bytes) ? unpackUltra(bytes) : unpackRaw(bytes);
 
-export const packEmbedSmall = async (art: Art, cfg: ArtCfg): Promise<string> => packU4(art, cfg, compress);
+export const packEmbedSmall = async (art: Art, cfg: ArtCfg, story = false): Promise<string> => packU4(art, cfg, compress, undefined, story);
 
 export const unpackEmbedSmall = async (source: string, codec: EmbedCodec): Promise<PackedEmbed> => {
   if (codec === "u1" || codec === "u2") return unpackEmbed(source, codec);

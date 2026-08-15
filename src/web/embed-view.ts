@@ -1,4 +1,5 @@
 import type { EmbedCodec } from "../embed/codec.ts";
+import { isJapaneseCompactPayload } from "../embed/japanese.ts";
 import { unpackEmbedSmall } from "../embed/small-browser.ts";
 import { makeStaticArtifact, type StaticArtifact } from "./static-artifact.ts";
 
@@ -127,8 +128,10 @@ export class EmbedView {
   private staticArtifact: StaticArtifact | null = null;
   private readonly compactTab: HTMLButtonElement;
   private readonly staticTab: HTMLButtonElement;
+  private readonly compactOptions: HTMLDivElement;
+  private readonly storyInput: HTMLInputElement;
 
-  constructor(private readonly host: HTMLElement) {
+  constructor(private readonly host: HTMLElement, private readonly onStoryChange?: (story: boolean) => void) {
     const tabs = document.createElement("div");
     tabs.className = "embed-code-tabs";
     tabs.setAttribute("role", "tablist");
@@ -136,7 +139,24 @@ export class EmbedView {
     this.compactTab = this.tab("Compact", "compact", true);
     this.staticTab = this.tab("No JavaScript", "static", false);
     tabs.append(this.compactTab, this.staticTab);
-    host.before(tabs);
+
+    this.compactOptions = document.createElement("div");
+    this.compactOptions.className = "embed-code-options";
+    const label = document.createElement("label");
+    label.className = "check embed-story-option";
+    this.storyInput = document.createElement("input");
+    this.storyInput.type = "checkbox";
+    this.storyInput.id = "payload-as-story";
+    this.storyInput.addEventListener("change", () => this.onStoryChange?.(this.storyInput.checked));
+    label.append(this.storyInput, document.createTextNode(" Payload as a story"));
+    const info = document.createElement("button");
+    info.type = "button";
+    info.className = "slider-info embed-story-info";
+    info.textContent = "?";
+    info.dataset.tip = "Encodes the complete image payload as reversible Japanese prose instead of the smallest Unicode payload. The embed is larger; the story itself is the image data. See README → Compact payload modes.";
+    info.setAttribute("aria-label", "About Payload as a story. Uses reversible Japanese prose for the complete image payload, making the embed larger. See the README section Compact payload modes for details.");
+    this.compactOptions.append(label, info);
+    host.before(tabs, this.compactOptions);
 
     const copy = document.querySelector<HTMLButtonElement>("#copy-embed");
     copy?.addEventListener("click", event => {
@@ -155,6 +175,10 @@ export class EmbedView {
       this.host.replaceChildren();
       return;
     }
+    try {
+      const packed = packedSource(source);
+      this.storyInput.checked = packed.codec === "u4" && isJapaneseCompactPayload(packed.data);
+    } catch {}
     if (this.mode === "static") void this.showStatic();
     else this.renderCode(source);
   }
@@ -177,6 +201,7 @@ export class EmbedView {
     this.mode = mode;
     this.compactTab.setAttribute("aria-selected", String(mode === "compact"));
     this.staticTab.setAttribute("aria-selected", String(mode === "static"));
+    this.compactOptions.hidden = mode !== "compact";
     if (!this.compact) {
       this.host.replaceChildren();
       return;
@@ -187,7 +212,7 @@ export class EmbedView {
 
   private staticPreview(artifact: StaticArtifact): string {
     if (!artifact.truncated) return artifact.preview;
-    return `${artifact.preview}\n<!-- Preview truncated in the maker. Copy embed copies the complete self-contained HTML. -->`;
+    return `${artifact.preview}\n<!-- Preview truncated in the studio. Copy embed copies the complete self-contained HTML. -->`;
   }
 
   private renderStaticPreview(artifact: StaticArtifact): void {

@@ -1,4 +1,4 @@
-# Unicode Art Maker
+# Unicode Art Studio
 
 PNG to dense Unicode text art for Bun and the browser, with optional true-colour foreground/background cells.
 
@@ -28,24 +28,24 @@ The numerical Resolution field is intentionally not capped at 2048. A user may t
 
 The hero starts in **Colour** at 256 cells with Atkinson dithering, 0.55 contrast, 1.20 detail and +0.25 threshold bias. **Full Colour** starts off. Turning hero colour off restores the original monochrome profile: 96 cells, Ordered 4x4, 1.12 contrast, 0.34 detail and +0.015 bias.
 
-The maker starts monochrome at the original slider defaults with Ordered 4x4. Its colour UI deliberately has only two controls: **Colour** is foreground-only colour on the normal Unicode mask, while **Full Colour** enables the adaptive two-colour foreground/background representation. There is no separate background-only mode in the browser UI. Enabling Colour keeps the slider values, switches the dither control to Atkinson and starts with Full Colour off.
+The studio starts monochrome at the original slider defaults with Ordered 4x4. Its colour UI deliberately has only two controls: **Colour** is foreground-only colour on the normal Unicode mask, while **Full Colour** enables the adaptive two-colour foreground/background representation. There is no separate background-only mode in the browser UI. Enabling Colour keeps the slider values, switches the dither control to Atkinson and starts with Full Colour off.
 
-The canvas control is the first checkbox. It reads **Dark canvas** in light mode and forces a dark preview surface when enabled; in dark mode it reads **Light canvas** and forces a light preview surface when enabled. Once changed manually, the maker keeps the actual selected surface across later theme/colour changes. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
+The canvas control is the first checkbox. It reads **Dark canvas** in light mode and forces a dark preview surface when enabled; in dark mode it reads **Light canvas** and forces a light preview surface when enabled. Once changed manually, the studio keeps the actual selected surface across later theme/colour changes. Changing the canvas also aligns Invert with that surface; Invert remains manually adjustable afterward.
 
 **Reset sliders** restores only Resolution, Contrast, Detail and Threshold bias to 96, 1.12, 0.34 and +0.015. It leaves Colour/Full Colour, dither, canvas and polarity untouched.
 
-The latest completed maker result is persisted locally in IndexedDB so a refresh does not need to regenerate the Unicode art or re-encode its embed. The art is stored as the same compact lossless binary representation used by the high-resolution worker path, and the finished embed is stored as a Blob. The source/configuration are retained so editing can resume after restoration. This cache is version-scoped and does **not** store the live high-resolution `Art` object graph or use IndexedDB as the worker transport path.
+The latest completed studio result is persisted locally in IndexedDB so a refresh does not need to regenerate the Unicode art or re-encode its embed. The art is stored as the same compact lossless binary representation used by the high-resolution worker path, and the finished embed is stored as a Blob. The source/configuration are retained so editing can resume after restoration. This cache is version-scoped and does **not** store the live high-resolution `Art` object graph or use IndexedDB as the worker transport path.
 
-Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-maker-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
+Browser TXT, HTML and SVG downloads are named `kitty-crow-github-io-unicode-art-studio-{sha256}.{ext}`, where the SHA-256 is calculated from the exact full downloadable bytes.
 
-The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Embed generation runs in a Worker. While it is running the maker shows **Generating embed** and an **Encoding art…** progress bar; the progress UI is hidden automatically when encoding reaches 100%.
+The displayed embed fragment is rendered as an HTML code block through Marked, DOMPurify and Highlight.js, using the same pinned CDN versions as the shared Pages README renderer. Embed generation runs in a Worker. While it is running the studio shows **Generating embed** and an **Encoding art…** progress bar; the progress UI is hidden automatically when encoding reaches 100%.
 
-Colour modes exposed by the browser maker:
+Colour modes exposed by the browser studio:
 
 - **Colour** — foreground colour follows the normal Unicode mask
 - **Full Colour** — each 2x4 source cell can use adaptive foreground and background colour groups
 
-The lower-level `colourBackground` configuration and legacy `--colour-background` CLI flag remain accepted for backwards compatibility, but the redundant background-only mode is no longer presented by the browser maker.
+The lower-level `colourBackground` configuration and legacy `--colour-background` CLI flag remain accepted for backwards compatibility, but the redundant background-only mode is no longer presented by the browser studio.
 
 ## CLI
 
@@ -80,21 +80,33 @@ The CLI does not impose the browser slider's 2048-cell ceiling. Very large resol
 
 ## Embedding
 
-The maker's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
+The studio's **Copy embed div** output carries the generated result itself, so the original PNG does not need to be uploaded or hosted. New embeds use the lossless `u4` codec.
 
-The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal small runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the existing copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+The embed code box has **Compact** and **No JavaScript** tabs. Compact is the normal runtime-backed embed. No JavaScript is generated lazily only when selected and expands the finished payload into literal Unicode plus inline CSS with no `<script>`, external stylesheet, external asset or network fetch; the existing copy button copies whichever tab is selected. The static form is intentionally much more verbose and, because it cannot measure font metrics at runtime, favours portability over the compact embed's calibrated cell geometry.
+
+### Compact payload modes
+
+Compact has one optional checkbox: **Payload as a story**.
+
+With the checkbox **off**, Compact uses the super-compact `u4` transport. The optimiser compares safe basE91 with **J8192**, a 13-bit Japanese-oriented alphabet of exactly 8,192 normalisation-stable BMP characters built from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. It chooses the shortest character count. For substantial payloads J8192 is roughly half the basE91 character count.
+
+With **Payload as a story** checked, the same compressed image bytes are encoded as deterministic Japanese prose instead. The prose is not a preview or decoration: the sentence templates, people, places, objects, verbs and other lexical choices are mixed-radix digits carrying the payload itself. Decoding those choices reconstructs the exact compressed bytes and therefore the exact image. Editing the story changes or corrupts the encoded image.
+
+Story mode is intentionally larger than super-compact mode because natural Japanese needs grammatical material that carries less information per visible character. The payoff is that the payload reads like surreal light-novel prose instead of looking like an encoded blob. The complete story remains a **single physical line** inside `data-unicode-art-data`; normal browser wrapping does not add payload newlines.
+
+The story grammar and lexicon are bundled locally as XML. Story encoding and decoding do not fetch a corpus, call an API or depend on a CDN corpus at runtime. Large story payloads are encoded in bounded 256-byte chapters joined by a fixed Japanese chapter transition. Each chapter uses only a bounded `BigInt`, avoiding the unbounded single-`BigInt` memory failure that very large payloads would otherwise hit while preserving one-line reversible output.
+
+Both Compact payload modes decode through the same `u4` runtime and produce the same artwork. The checkbox changes only how the compact payload is represented.
 
 `u4` is an optimiser. It tries exact mask representations including direct, left/up/Paeth prediction, modular deltas and bit-plane shuffling. For colour it tries exact pair palettes, bit-packed RGB palettes, RGB spatial residuals and reversible YCoCg residuals. It also keeps the complete `u3` representation family in the search.
 
 Every candidate is considered raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11; the previous `u3` family is always tested with Brotli 11. Small and medium results search more candidates than very large results so encoding remains computationally sensible.
 
-For each binary candidate, `u4` now compares the established safe ASCII basE91 transport with **J8192**, a 13-bit Japanese-oriented alphabet of exactly 8,192 normalisation-stable BMP characters built from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. The optimiser deliberately chooses the shortest **character count**, because this transport targets copied/source payload length. For substantial payloads J8192 is roughly **half the basE91 character count**, although its UTF-8 byte size is larger because the Japanese characters occupy multiple UTF-8 bytes.
-
-The J8192 encoder/decoder is simple linear bit packing. Brotli remains the expensive part of embed generation. Existing CJK-4096 `u4` payloads from 0.4.28 and older basE91 `u4` payloads remain fully decodable, and arbitrary Unicode is still rejected by the embed template validator. Browser encoding runs in a dedicated Worker, so the expensive search does not block the maker UI.
+The J8192 encoder/decoder is simple linear bit packing. Brotli remains the expensive part of super-compact embed generation. Existing CJK-4096 `u4` payloads from 0.4.28, J8192 payloads from 0.4.29 and older basE91 `u4` payloads remain fully decodable. Browser encoding runs in a dedicated Worker, so the expensive search does not block the studio UI.
 
 New copied embeds contain only the readable outer host attributes, one self-identifying single-line payload script and one loader script. The repeated Shadow DOM template, stylesheet link and API URL are no longer copied into every fragment: `embed.js` reconstructs the internal scaffold and stylesheet, while `load.js` derives the API URL from its own URL. The decoder remains part of this repository and is bundled into the published runtime.
 
-The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2`, `u3`, previous basE91 `u4` payloads and the 0.4.28 CJK-4096 `u4` transport.
+The CDN runtime remains backwards-compatible with the previous explicit template/data-codec form and with `u1`, `u2`, `u3`, previous basE91 `u4` payloads, the 0.4.28 CJK-4096 transport, the 0.4.29 J8192 transport and the original 0.4.35 story payload format.
 
 Published assets:
 
@@ -125,7 +137,7 @@ import {
   taggedText,
   unpackEmbedSmall,
   vectorStage,
-} from "@kitty-crow/unicode-art-maker";
+} from "@kitty-crow/unicode-art-studio";
 ```
 
 ## Project layout
@@ -136,7 +148,7 @@ src/colour/      colour sampling, full-colour cells and TXT/ANSI tags
 src/vector/      Vectoriser adapter and SVG rasterisation
 src/html/        dense HTML output
 src/embed/       packed/compressed embed codec, generator and browser runtime
-src/web/         browser behaviour, IndexedDB cache and embed worker
+src/web/         browser studio behaviour, IndexedDB cache and embed worker
 src/cli/         CLI parsing and output
 templates/embed/ paste-ready embed host, CSS and loader
 extras/term/     generic C colour header and terminal viewer

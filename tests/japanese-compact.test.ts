@@ -14,7 +14,7 @@ const bytesFor = (seed: number, length: number): Uint8Array => {
   return out;
 };
 
-test("Japanese Compact is a single-line reversible payload", () => {
+test("story payload is single-line and reversible", () => {
   for (const mode of modes) {
     for (let length = 0; length <= 96; length += 1) {
       const bytes = bytesFor(length * 7919 + mode.charCodeAt(0), length);
@@ -30,7 +30,19 @@ test("Japanese Compact is a single-line reversible payload", () => {
   }
 });
 
-test("current u4 Japanese Compact transport round-trips exact bytes", () => {
+test("story payload uses bounded chapters for large byte streams", () => {
+  const bytes = bytesFor(0x51f15e, 16 * 1024);
+  bytes[0] = 0;
+  bytes[1] = 0;
+  const encoded = encodeJapaneseCompact("b", bytes);
+  const decoded = decodeJapaneseCompact(encoded);
+  expect(encoded).toContain("――そして、物語は次の章へ。");
+  expect(encoded).not.toMatch(/[\r\n]/u);
+  expect(decoded.mode).toBe("b");
+  expect(decoded.bytes).toEqual(bytes);
+});
+
+test("u4 story transport round-trips exact bytes", () => {
   for (let seed = 1; seed <= 128; seed += 1) {
     const mode = modes[seed % modes.length]!;
     const bytes = bytesFor(seed, seed % 47);
@@ -42,7 +54,7 @@ test("current u4 Japanese Compact transport round-trips exact bytes", () => {
   }
 });
 
-test("new Compact embed stores only Japanese prose in the payload line", () => {
+test("story Compact embed stores only Japanese prose in the payload line", () => {
   const data = encodeU4Japanese("b", bytesFor(42, 32));
   const template = `<div data-unicode-art><script type="application/octet-stream" data-unicode-art-data data-codec="{{CODEC}}">{{DATA}}</script><script src="{{LOAD_SRC}}"></script></div>`;
   const html = new Tpl().make({

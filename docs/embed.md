@@ -18,21 +18,35 @@ Mask candidates include direct bytes, left/up/Paeth prediction, modular deltas a
 
 Every candidate is tested raw and with maximum DEFLATE. The strongest candidates are also tested with Brotli quality 11, and all `u3` candidates are always tested with Brotli 11. Small and medium art searches more Brotli candidates than very large art so the browser cost stays bounded.
 
-`u4` compares two text transports for every new binary candidate. The established basE91 transport remains available and is still the byte-efficient ASCII form. **J8192** maps each 13 bits to one of exactly 8,192 normalisation-stable BMP characters drawn from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. A small explicit marker records compression mode and the final 0–12 meaningful tail bits so arbitrary binary payloads round-trip exactly.
+### Super compact
 
-The optimiser chooses the shortest **JavaScript/clipboard character count**, not the fewest UTF-8 bytes. J8192 therefore normally wins for non-trivial payloads because it carries 13 bits per character versus roughly 6.5 bits per basE91 character. Its visible/source payload is roughly half the basE91 character count, at the cost of larger UTF-8 transfer size because the Japanese characters use multiple UTF-8 bytes. Encoding and decoding are linear bit packing/unpacking; Brotli remains the expensive part of embed generation.
+The default Compact payload compares two text transports for each binary candidate. The established basE91 transport remains available and is the byte-efficient ASCII form. **J8192** maps each 13 bits to one of exactly 8,192 normalisation-stable BMP characters drawn from Hiragana, Katakana, Japanese punctuation and Japanese JIS-mapped unified ideographs. A small explicit marker records compression mode and the final 0–12 meaningful tail bits so arbitrary binary payloads round-trip exactly.
 
-Old `u4` payloads remain valid. Unmarked Brotli basE91 and the existing `&r` / `&d` basE91 forms decode exactly as before. The 0.4.28 CJK-4096 transport with uppercase `&R`, `&D` or `&B` markers also remains decodable. New J8192 payloads use explicit `&J`, `&K` or `&L` markers for raw, DEFLATE or Brotli plus one tail-bit character, so the transport is never guessed from arbitrary Unicode.
+The optimiser chooses the shortest JavaScript/clipboard character count, not the fewest UTF-8 bytes. J8192 therefore normally wins for non-trivial payloads because it carries 13 bits per character versus roughly 6.5 bits per basE91 character. Encoding and decoding are linear bit packing/unpacking; Brotli remains the expensive part.
+
+### Payload as a story
+
+The Studio's Compact panel includes **Payload as a story**. When checked, the exact same compressed image bytes are encoded as deterministic Japanese prose instead of basE91/J8192.
+
+The prose is the payload. Grammar-template selection and the selected people, places, objects, verbs and other lexical choices are mixed-radix digits. Decoding those choices reconstructs the exact compression mode and exact byte stream before normal `u4` unpacking. The payload remains one physical line inside `data-unicode-art-data`; changing the prose changes or corrupts the image.
+
+The grammar and lexicon are bundled locally as XML. Story mode performs no corpus fetch and calls no corpus API. It is intentionally larger than super-compact mode because grammatical Japanese carries fewer payload bits per visible character.
+
+Large story payloads use bounded chapters. At most 256 framed bytes are converted to any one `BigInt`, then the resulting Japanese chapters are joined by a fixed Japanese transition phrase. This avoids the unbounded whole-payload `BigInt` allocation that previously failed on very large images while keeping the complete payload single-line and reversible. The decoder also accepts the original 0.4.35 whole-payload story format.
+
+### Compatibility
+
+Old `u4` payloads remain valid. Unmarked Brotli basE91 and the existing `&r` / `&d` basE91 forms decode exactly as before. The 0.4.28 CJK-4096 transport with uppercase `&R`, `&D` or `&B` markers remains decodable, and J8192 `&J`, `&K` and `&L` payloads remain decodable.
 
 New fragments keep only the outer host configuration, one self-identifying payload script and one loader script in the copied HTML. The Shadow DOM scaffold and stylesheet link are reconstructed by `embed.js`, and `load.js` derives the API URL from its own URL. Static template markup is therefore not repeated in every embed.
 
-The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2`, `u3`, previous basE91 `u4` payloads and the 0.4.28 CJK-4096 transport, so previously copied embeds continue to work.
+The runtime still accepts the previous explicit `<template>` / `data-codec` form and still decodes `u1`, `u2`, `u3`, previous basE91 `u4`, CJK-4096, J8192 and original story payloads, so previously copied embeds continue to work.
 
-The template validator accepts J8192 only when it has the explicit transport marker and every payload character belongs to the exact 8,192-character alphabet. Arbitrary Unicode is still rejected. Tests verify that the complete J8192 alphabet is unchanged by NFC, NFD, NFKC and NFKD normalization; the legacy CJK-4096 normalization tests remain in place as well.
+Tests verify that the complete J8192 alphabet is unchanged by NFC, NFD, NFKC and NFKD normalisation; the legacy CJK-4096 normalisation tests remain in place as well.
 
 ## Browser
 
-The maker performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. A progress bar reports the optimisation search while the worker evaluates candidates, so the heavier encoder stays visible without blocking slider interaction. Decoding remains fast in the normal CDN runtime.
+The Studio performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. A progress bar reports the optimisation search while the worker evaluates candidates, so the heavier encoder stays visible without blocking slider interaction. Changing **Payload as a story** regenerates only the embed; it does not rerender or revectorise the artwork.
 
 The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
 
