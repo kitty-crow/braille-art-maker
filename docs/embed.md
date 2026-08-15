@@ -3,9 +3,9 @@
 GitHub Pages publishes the browser embed assets at:
 
 ```text
-https://kitty-crow.github.io/braille-art-maker/v1/embed.js
-https://kitty-crow.github.io/braille-art-maker/v1/embed.css
-https://kitty-crow.github.io/braille-art-maker/v1/load.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.js
+https://kitty-crow.github.io/unicode-art-studio/v1/embed.css
+https://kitty-crow.github.io/unicode-art-studio/v1/load.js
 ```
 
 The embed carries the generated result itself. The source PNG does not need to be hosted or sent anywhere after conversion.
@@ -48,7 +48,7 @@ Tests verify that the complete J8192 alphabet is unchanged by NFC, NFD, NFKC and
 
 The Studio performs `u4` optimisation in a dedicated Web Worker after the live Unicode preview has updated. A progress bar reports the optimisation search while the worker evaluates candidates, so the heavier encoder stays visible without blocking slider interaction. Changing **Payload as a story** regenerates only the embed; it does not rerender or revectorise the artwork.
 
-The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer.
+The visible fragment is rendered through Marked, sanitised with DOMPurify and syntax-highlighted with Highlight.js using the same pinned CDN versions as the shared Pages README renderer. The copy action sits in the top-right of the embed code box and copies whichever **Compact** or **No JavaScript** tab is selected. Its copy icon changes to a checkmark after a successful clipboard write, then returns to the copy icon.
 
 The consuming site controls the size and position of the outer div. Rendering is isolated in Shadow DOM.
 
