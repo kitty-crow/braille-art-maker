@@ -17,12 +17,15 @@ const art: Art = {
   density: 0.5,
 };
 
-test("static art embed is self-contained HTML with inline CSS and no JavaScript or fetching", () => {
+test("static art embed is self-contained formatted HTML with inline CSS and no JavaScript or fetching", () => {
   const html = staticArtHtml(art, {});
   expect(html).toContain('role="img"');
   expect(html).toContain("⣿⠿");
   expect(html).toContain("container-type:inline-size");
   expect(html).toContain("aspect-ratio:1");
+  expect(html).toContain(">\n  <div style=");
+  expect(html).toContain("\n    <div style=");
+  expect(html.endsWith("\n</div>")).toBe(true);
   expect(html).not.toMatch(/<script\b/iu);
   expect(html).not.toMatch(/<link\b/iu);
   expect(html).not.toMatch(/\bsrc=/iu);
@@ -69,6 +72,7 @@ test("dense full-colour static output is row-bounded rather than one span per ce
   const html = staticPackedHtml(packed);
   expect((html.match(/<span\b/gu) ?? []).length).toBe(rows);
   expect((html.match(/linear-gradient\(to right/gu) ?? []).length).toBe(rows * 2);
+  expect((html.match(/\n    <div style=/gu) ?? []).length).toBe(rows);
   expect(html).toContain("width:min(100%,40rem);aspect-ratio:1");
 });
 
@@ -80,18 +84,19 @@ test("static geometry uses the same square-host limiting axis as compact runtime
     dotsHeight: 16,
   };
   const html = staticArtHtml(tall, {});
-  // max(columns=2, rows*2=8) => 160/8 = 20cqw font and 200/8 = 25cqw line height.
   expect(html).toContain("font-size:20.00000000cqw");
   expect(html).toContain("line-height:25.00000000cqw");
 });
 
-test("embed code view exposes Compact and No JavaScript tabs and decodes directly to static packed HTML", async () => {
+test("embed code view exposes Compact and No JavaScript tabs and safely highlights large static output", async () => {
   const view = await readFile(join(root, "src", "web", "embed-view.ts"), "utf8");
   expect(view).toContain('this.tab("Compact", "compact", true)');
   expect(view).toContain('this.tab("No JavaScript", "static", false)');
   expect(view).toContain("unpackEmbedSmall");
   expect(view).toContain("staticPackedHtml(decoded)");
-  expect(view).toContain('if (this.mode !== "static") return;');
-  expect(view).toContain("event.stopImmediatePropagation();");
+  expect(view).toContain("maskCompactPayload(source) ?? maskStaticSource(source)");
+  expect(view).toContain("restoreMaskedSource(this.host, masked)");
+  expect(view).toContain('source.includes(\'aria-label="Generated Unicode art"\')');
+  expect(view).toContain('source.replace(/style="([^\\"]*)"/gu');
   expect(view).toContain("Building self-contained HTML…");
 });
