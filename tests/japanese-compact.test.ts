@@ -52,7 +52,7 @@ test("silent-witch vocabulary is added without mutating the legacy corpus", () =
 });
 
 test("story payload uses bounded chapters for large byte streams", () => {
-  const bytes = bytesFor(0x51f15e, 16 * 1024);
+  const bytes = bytesFor(0x51f15e, 64 * 1024);
   bytes[0] = 0;
   bytes[1] = 0;
   const encoded = encodeJapaneseCompact("b", bytes);
@@ -91,6 +91,15 @@ test("story Compact embed stores only Japanese prose in the payload line", () =>
   expect(match?.[1]).not.toMatch(/^[1-4&]/u);
   expect(match?.[1]).not.toMatch(/[\r\n]/u);
   expect(decodeU4(match?.[1] ?? "").bytes).toEqual(decodeU4(data).bytes);
+});
+
+test("multi-megabyte story payload can be validated and inserted without stack-sensitive spreads", () => {
+  const data = `${japaneseCompactPrefix}${"静かな物語。".repeat(300_000)}`;
+  const template = `<script type="application/octet-stream" data-unicode-art-data data-codec="{{CODEC}}">{{DATA}}</script>`;
+  const html = new Tpl().make({ data, codec: "u4", theme: "auto", surface: "auto", src: "x/embed.js" }, { html: template });
+  expect(html.length).toBeGreaterThan(data.length);
+  expect(html).toContain(data.slice(0, 128));
+  expect(html.endsWith("</script>")).toBe(true);
 });
 
 test("legacy template envelopes remain supported for callers without CODEC placeholder", () => {
