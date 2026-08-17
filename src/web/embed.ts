@@ -19,13 +19,13 @@ interface Pending {
   readonly oneShot: boolean;
 }
 
-const transferAt = 256;
+const transferAbove = 256;
 let nextId = 0;
 let worker: Worker | null = null;
 const pending = new Map<number, Pending>();
 
 export const shouldTransferEmbedRaw = (columns: number, cfg: ArtCfg, story: boolean): boolean =>
-  columns >= transferAt || (story && cfg.fullColour === true);
+  columns >= transferAbove || (story && cfg.fullColour === true);
 
 const disposeWorker = (): void => {
   worker?.terminate();
