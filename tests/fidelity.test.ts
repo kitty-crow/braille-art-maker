@@ -106,7 +106,8 @@ test("high-resolution browser encoding transfers one bounded raw buffer instead 
   expect(web).toContain("const transferAbove = 256;");
   expect(web).toContain("const raw = preparedRaw ?? packBoundedRaw(art, cfg);");
   expect(web).toContain("[raw.buffer as ArrayBuffer]");
-  expect(web).toContain("const oneShot = art.columns > transferAbove;");
+  expect(web).toContain("const oneShot = shouldTransferEmbedRaw(art.columns, cfg, story);");
+  expect(web).toContain("columns >= transferAbove || (story && cfg.fullColour === true)");
   expect(web).toContain("if (wait.oneShot && pending.size === 0) disposeWorker();");
   expect(web).toContain("{ id, raw, cfg, theme, surface, story }");
   expect(raw).toContain("const chunkSize = 64 * 1024;");
