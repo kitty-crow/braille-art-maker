@@ -19,7 +19,7 @@ interface Pending {
   readonly oneShot: boolean;
 }
 
-const transferAbove = 256;
+const transferAt = 256;
 let nextId = 0;
 let worker: Worker | null = null;
 const pending = new Map<number, Pending>();
@@ -78,7 +78,10 @@ export const embedHtml = (
   cancelEmbedHtml();
 
   const id = ++nextId;
-  const oneShot = art.columns > transferAbove;
+  // Full-colour story mode is intentionally forced through the bounded raw handoff.
+  // The optimiser path can create very large intermediate candidate graphs at 256 columns
+  // and overflow mobile JavaScript stacks before the already chunked story encoder runs.
+  const oneShot = art.columns >= transferAt || (story && cfg.fullColour === true);
   pending.set(id, { resolve, reject, ...(progress ? { progress } : {}), oneShot });
 
   if (oneShot) {
